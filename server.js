@@ -11,13 +11,14 @@
 
 const http   = require('http');
 const https  = require('https');
+const tls    = require('tls');
 const fs     = require('fs');
 const path   = require('path');
 const os     = require('os');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const { URL } = require('url');
 
-const PORT   = process.env.PORT ? parseInt(process.env.PORT) : 3080;
+const PORT   = process.env.PORT ? parseInt(process.env.PORT) : 3090;
 const PUBLIC = path.join(__dirname, 'public');
 
 const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
@@ -70,38 +71,324 @@ function mimeType(p) {
 // ─── HTTP ──────────────────────────────────────────────────────────
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-function doRequest(opts, body) {
+function parseProxyUrl(raw) {
+  if (!raw) return null;
+  let v = String(raw).trim();
+  if (!v) return null;
+  if (!/^[a-z]+:\/\//i.test(v)) v = `http://${v}`;
+  try {
+    const u = new URL(v);
+    if (!u.hostname) return null;
+    return {
+      protocol: (u.protocol || 'http:').toLowerCase(),
+      hostname: u.hostname,
+      port: u.port ? parseInt(u.port) : ((u.protocol || '').toLowerCase() === 'https:' ? 443 : 80),
+      username: decodeURIComponent(u.username || ''),
+      password: decodeURIComponent(u.password || ''),
+    };
+  } catch {
+    return null;
+  }
+}
+function parseWinProxyServer(raw, protocol) {
+  const v = String(raw || '').trim();
+  if (!v) return null;
+  const map = {};
+  for (const seg of v.split(';').map(s => s.trim()).filter(Boolean)) {
+    const m = seg.match(/^([^=]+)=(.+)$/);
+    if (m) map[m[1].toLowerCase()] = m[2].trim();
+  }
+  const key = protocol === 'https:' ? 'https' : 'http';
+  const pick = map[key] || map.http || map.https || (Object.keys(map).length ? '' : v);
+  return parseProxyUrl(pick);
+}
+function readWindowsSystemProxy(protocol) {
+  if (process.platform !== 'win32') return null;
+  try {
+    const enable = execFileSync(
+      'reg.exe',
+      ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings', '/v', 'ProxyEnable'],
+      { encoding: 'utf8' }
+    );
+    if (!/\b0x1\b/i.test(enable)) return null;
+    const server = execFileSync(
+      'reg.exe',
+      ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings', '/v', 'ProxyServer'],
+      { encoding: 'utf8' }
+    );
+    const m = server.match(/ProxyServer\s+REG_\w+\s+([^\r\n]+)/i);
+    return m ? parseWinProxyServer(m[1], protocol) : null;
+  } catch {
+    return null;
+  }
+}
+function resolveProxyForProtocol(protocol) {
+  const isHttps = protocol === 'https:';
+  const envRaw = isHttps
+    ? (process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy || process.env.ALL_PROXY || process.env.all_proxy || '')
+    : (process.env.HTTP_PROXY || process.env.http_proxy || process.env.ALL_PROXY || process.env.all_proxy || '');
+  return parseProxyUrl(envRaw) || readWindowsSystemProxy(protocol);
+}
+function proxyAuth(proxy) {
+  if (!proxy || !proxy.username) return '';
+  const token = Buffer.from(`${proxy.username}:${proxy.password || ''}`, 'utf8').toString('base64');
+  return `Basic ${token}`;
+}
+function formatProxyUrl(proxy) {
+  if (!proxy || !proxy.hostname) return '';
+  const auth = proxy.username
+    ? `${encodeURIComponent(proxy.username)}:${encodeURIComponent(proxy.password || '')}@`
+    : '';
+  return `http://${auth}${proxy.hostname}:${proxy.port || 80}`;
+}
+function proxyKey(proxy) {
+  if (!proxy) return 'direct';
+  return `${proxy.protocol || 'http:'}|${proxy.hostname}|${proxy.port || 80}|${proxy.username || ''}|${proxy.password || ''}`;
+}
+function getProxyCandidates(protocol, hostname) {
+  const list = [];
+  const add = (p) => { if (p && p.hostname) list.push(p); };
+  const customProxyHost = String(process.env.WALLHUB_PROXY_HOST || '').trim();
+  add(parseProxyUrl(process.env.WALLHUB_PROXY || process.env.wallhub_proxy || ''));
+  const resolved = resolveProxyForProtocol(protocol);
+  add(resolved);
+  if (customProxyHost && resolved && /^(127\.0\.0\.1|localhost)$/i.test(resolved.hostname)) {
+    add(parseProxyUrl(`http://${customProxyHost}:${resolved.port || 80}`));
+  }
+  const extraPortsRaw = String(process.env.WALLHUB_PROXY_PORTS || '').trim();
+  if (extraPortsRaw && process.platform === 'win32') {
+    const ports = extraPortsRaw
+      .split(',')
+      .map(s => parseInt(String(s).trim()))
+      .filter(n => n > 0 && n < 65536);
+    const hosts = customProxyHost ? ['127.0.0.1', 'localhost', customProxyHost] : ['127.0.0.1', 'localhost'];
+    for (const p of ports) {
+      for (const h of hosts) add(parseProxyUrl(`http://${h}:${p}`));
+    }
+  }
+  const seen = new Set();
+  const uniq = [];
+  for (const p of list) {
+    const k = proxyKey(p);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    uniq.push(p);
+  }
+  if (!(isSteamHost(hostname) && uniq.length > 0)) uniq.push(null);
+  return uniq;
+}
+function shouldRetryWithNextProxy(err) {
+  if (!err) return false;
+  if (err.code && ['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'EPROTO'].includes(err.code)) return true;
+  const m = String(err.message || '');
+  return /Proxy CONNECT|ECONNREFUSED|ETIMEDOUT|socket hang up/i.test(m);
+}
+function isSteamHost(hostname) {
+  const h = String(hostname || '').toLowerCase();
+  return h.includes('steamcommunity.com') || h.includes('steampowered.com') || h.includes('steamusercontent.com');
+}
+function buildUrlFromOpts(opts) {
+  const protocol = opts.protocol || 'https:';
+  const port = opts.port ? `:${opts.port}` : '';
+  return `${protocol}//${opts.hostname}${port}${opts.path || '/'}`;
+}
+function doRequestByCurl(opts, body, timeout, proxy) {
   return new Promise((resolve, reject) => {
-    const req = https.request(opts, rs => {
-      // Follow redirect once
+    const url = buildUrlFromOpts(opts);
+    const args = [
+      '--silent',
+      '--show-error',
+      '--location',
+      '--max-time', String(Math.max(8, Math.ceil((timeout || 22000) / 1000))),
+      '--request', opts.method || 'GET',
+      '--url', url,
+      '--output', '-',
+      '--write-out', '\n__WALLHUB_HTTP_CODE__:%{http_code}',
+    ];
+    if (proxy && proxy.hostname) args.push('--proxy', formatProxyUrl(proxy));
+    const headers = opts.headers || {};
+    for (const [k, v] of Object.entries(headers)) {
+      if (v === undefined || v === null || v === '') continue;
+      args.push('-H', `${k}: ${String(v)}`);
+    }
+    if (body && String(opts.method || 'GET').toUpperCase() !== 'GET') {
+      const payload = Buffer.isBuffer(body) ? body.toString('utf8') : String(body);
+      args.push('--data-binary', payload);
+    }
+    const cp = spawn('curl.exe', args, { windowsHide: true, env: Object.assign({}, process.env) });
+    const chunks = [];
+    let err = '';
+    cp.stdout.on('data', d => chunks.push(Buffer.from(d)));
+    cp.stderr.on('data', d => err += d.toString());
+    cp.on('error', e => reject(e));
+    cp.on('close', code => {
+      const raw = Buffer.concat(chunks).toString('utf8');
+      const marker = '\n__WALLHUB_HTTP_CODE__:';
+      const idx = raw.lastIndexOf(marker);
+      const httpCode = idx >= 0 ? parseInt(raw.slice(idx + marker.length).trim()) : 0;
+      const bodyText = idx >= 0 ? raw.slice(0, idx) : raw;
+      if (code !== 0) return reject(new Error((err || `curl exit ${code}`).trim().slice(-1200)));
+      if (httpCode < 200 || httpCode >= 300) return reject(new Error(`HTTP ${httpCode || 502}`));
+      resolve(Buffer.from(bodyText, 'utf8'));
+    });
+  });
+}
+function doRequestByCurlCascade(opts, body, timeout, proxies, idx) {
+  const i = idx || 0;
+  const proxy = proxies[Math.min(i, proxies.length - 1)];
+  return doRequestByCurl(opts, body, timeout, proxy).catch((e) => {
+    if (shouldRetryWithNextProxy(e) && i + 1 < proxies.length) {
+      return doRequestByCurlCascade(opts, body, timeout, proxies, i + 1);
+    }
+    throw e;
+  });
+}
+const AUTO_PROXY = resolveProxyForProtocol('https:') || resolveProxyForProtocol('http:');
+if (AUTO_PROXY) {
+  const auto = formatProxyUrl(AUTO_PROXY);
+  if (auto) {
+    if (!process.env.HTTP_PROXY && !process.env.http_proxy) {
+      process.env.HTTP_PROXY = auto;
+      process.env.http_proxy = auto;
+    }
+    if (!process.env.HTTPS_PROXY && !process.env.https_proxy) {
+      process.env.HTTPS_PROXY = auto;
+      process.env.https_proxy = auto;
+    }
+    if (!process.env.ALL_PROXY && !process.env.all_proxy) {
+      process.env.ALL_PROXY = auto;
+      process.env.all_proxy = auto;
+    }
+  }
+}
+
+function doRequest(opts, body, redirects, proxyIndex) {
+  const redirectCount = redirects || 0;
+  const currentProxyIndex = proxyIndex || 0;
+  const protocol = opts.protocol || 'https:';
+  const timeout = opts.timeout || 22000;
+  const proxies = getProxyCandidates(protocol, opts.hostname);
+  const proxy = proxies[Math.min(currentProxyIndex, proxies.length - 1)];
+  const attemptTimeout = proxy ? Math.min(timeout, 12000) : timeout;
+  if (process.platform === 'win32' && process.env.WALLHUB_DISABLE_CURL_PROXY !== '1') {
+    return doRequestByCurlCascade(opts, body, attemptTimeout, proxies, currentProxyIndex);
+  }
+  return new Promise((resolve, reject) => {
+    const retryNext = (err) => {
+      if (shouldRetryWithNextProxy(err) && currentProxyIndex + 1 < proxies.length) {
+        return doRequest(opts, body, redirectCount, currentProxyIndex + 1).then(resolve).catch(reject);
+      }
+      reject(err);
+    };
+    const onResponse = (rs) => {
       if (rs.statusCode >= 300 && rs.statusCode < 400 && rs.headers.location) {
         rs.resume();
+        if (redirectCount >= 3) return reject(new Error('Too many redirects'));
         let loc = rs.headers.location;
-        if (!loc.startsWith('http')) loc = `https://${opts.hostname}${loc}`;
+        if (!/^https?:\/\//i.test(loc)) loc = `${protocol}//${opts.hostname}${loc}`;
         try {
           const u = new URL(loc);
-          return doRequest({ hostname:u.hostname, path:u.pathname+u.search,
-                             method:'GET', headers:opts.headers, timeout:opts.timeout })
+          return doRequest({
+            protocol: u.protocol,
+            hostname: u.hostname,
+            port: u.port ? parseInt(u.port) : undefined,
+            path: u.pathname + u.search,
+            method: 'GET',
+            headers: opts.headers,
+            timeout,
+          }, null, redirectCount + 1, 0)
             .then(resolve).catch(reject);
         } catch(e) { return reject(e); }
       }
-      if (rs.statusCode !== 200) { rs.resume(); return reject(new Error(`HTTP ${rs.statusCode}`)); }
+      if (rs.statusCode < 200 || rs.statusCode >= 300) { rs.resume(); return reject(new Error(`HTTP ${rs.statusCode}`)); }
       const bufs = [];
       rs.on('data', d => bufs.push(d));
       rs.on('end',  () => resolve(Buffer.concat(bufs)));
-      rs.on('error', reject);
+      rs.on('error', retryNext);
+    };
+    const onError = (e) => retryNext(e);
+    const writeEnd = (req) => {
+      req.on('error', onError);
+      req.on('timeout', () => req.destroy(new Error('Timeout')));
+      if (body) req.write(body);
+      req.end();
+    };
+    if (!proxy) {
+      const mod = protocol === 'http:' ? http : https;
+      const req = mod.request({
+        protocol,
+        hostname: opts.hostname,
+        port: opts.port || (protocol === 'http:' ? 80 : 443),
+        path: opts.path,
+        method: opts.method || 'GET',
+        headers: opts.headers || {},
+        timeout: attemptTimeout,
+      }, onResponse);
+      writeEnd(req);
+      return;
+    }
+    const auth = proxyAuth(proxy);
+    if (protocol === 'http:') {
+      const headers = Object.assign({}, opts.headers || {});
+      if (auth) headers['Proxy-Authorization'] = auth;
+      const fullPath = `${protocol}//${opts.hostname}${opts.port ? `:${opts.port}` : ''}${opts.path || '/'}`;
+      const req = http.request({
+        hostname: proxy.hostname,
+        port: proxy.port || 80,
+        method: opts.method || 'GET',
+        path: fullPath,
+        headers,
+        timeout: attemptTimeout,
+      }, onResponse);
+      writeEnd(req);
+      return;
+    }
+    const connectHeaders = {};
+    if (auth) connectHeaders['Proxy-Authorization'] = auth;
+    const connectReq = http.request({
+      hostname: proxy.hostname,
+      port: proxy.port || 80,
+      method: 'CONNECT',
+      path: `${opts.hostname}:${opts.port || 443}`,
+      headers: connectHeaders,
+      timeout: attemptTimeout,
     });
-    req.on('error', reject);
-    req.on('timeout', () => req.destroy(new Error('Timeout')));
-    if (body) req.write(body);
-    req.end();
+    connectReq.on('connect', (res, socket) => {
+      if (res.statusCode !== 200) {
+        socket.destroy();
+        return reject(new Error(`Proxy CONNECT ${res.statusCode}`));
+      }
+      const secureSocket = tls.connect({
+        socket,
+        servername: opts.hostname,
+      });
+      secureSocket.on('error', onError);
+      const req = https.request({
+        hostname: opts.hostname,
+        port: opts.port || 443,
+        path: opts.path,
+        method: opts.method || 'GET',
+        headers: opts.headers || {},
+        createConnection: () => secureSocket,
+        agent: false,
+        timeout: attemptTimeout,
+      }, onResponse);
+      writeEnd(req);
+    });
+    connectReq.on('error', onError);
+    connectReq.on('timeout', () => connectReq.destroy(new Error('Timeout')));
+    connectReq.end();
   });
 }
 
 function GET(url, extra, timeout) {
   const u = new URL(url);
   return doRequest({
-    hostname: u.hostname, path: u.pathname + u.search, method: 'GET',
+    protocol: u.protocol,
+    hostname: u.hostname,
+    port: u.port ? parseInt(u.port) : undefined,
+    path: u.pathname + u.search,
+    method: 'GET',
     headers: Object.assign({
       'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9', 'Accept-Encoding': 'identity',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -115,7 +402,11 @@ function POST(url, body, timeout) {
   const u   = new URL(url);
   const buf = Buffer.from(body, 'utf8');
   return doRequest({
-    hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
+    protocol: u.protocol,
+    hostname: u.hostname,
+    port: u.port ? parseInt(u.port) : undefined,
+    path: u.pathname + u.search,
+    method: 'POST',
     headers: {
       'User-Agent': UA, 'Accept-Encoding': 'identity', 'Accept': 'application/json',
       'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': buf.length,
@@ -231,8 +522,19 @@ async function scrapeIds(params) {
   // Extract all publishedfileids
   const seen = new Set();
   const ids  = [];
+  const authors = {};
   for (const m of html.matchAll(/data-publishedfileid="(\d+)"/g)) {
-    if (!seen.has(m[1])) { seen.add(m[1]); ids.push(m[1]); }
+    const id = m[1];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+    const idx = typeof m.index === 'number' ? m.index : -1;
+    if (idx >= 0) {
+      const block = html.substring(idx, idx + 2600);
+      const authorM = block.match(/class="workshopItemAuthorName[^"]*"[\s\S]{0,1000}?<a[^>]*>([\s\S]*?)<\/a>/i);
+      const author = cleanText(authorM ? authorM[1] : '');
+      if (author) authors[id] = author;
+    }
   }
 
   console.log(`[Scrape] Found ${ids.length} IDs, totalCount from HTML: ${totalCount}`);
@@ -248,7 +550,7 @@ async function scrapeIds(params) {
     console.log('[Scrape] ⚠️ No publishedfileid found! HTML length:', html.length);
   }
 
-  return { ids, totalCount };
+  return { ids, totalCount, authors };
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -269,7 +571,7 @@ async function handleQuery(req, res) {
   }
 
   try {
-    const mapItem = (id, d) => {
+    const mapItem = (id, d, authorName = '') => {
       if (d && d.result === 1) {
         return {
           publishedfileid:        id,
@@ -285,6 +587,7 @@ async function handleQuery(req, res) {
           time_created:           d.time_created       || 0,
           short_description:      d.short_description  || '',
           tags:                   d.tags               || [],
+          author:                 authorName           || '',
           creator:                d.creator            || '',
         };
       }
@@ -292,13 +595,13 @@ async function handleQuery(req, res) {
         publishedfileid: id, title: `壁纸 ${id}`, preview_url: '',
         subscriptions: 0, lifetime_subscriptions: 0, views: 0,
         favorited: 0, lifetime_favorited: 0, file_size: 0,
-        time_updated: 0, time_created: 0, short_description: '', tags: [], creator: '',
+        time_updated: 0, time_created: 0, short_description: '', tags: [], author: '', creator: '',
       };
     };
 
     const hasGenreOr = genreOr.length > 1;
     if (!hasGenreOr) {
-      const { ids, totalCount } = await scrapeIds(params);
+      const { ids, totalCount, authors } = await scrapeIds(params);
       if (!ids.length) {
         return jsonRes(res, 200, { response: { publishedfiledetails: [], total: 0 } });
       }
@@ -307,7 +610,7 @@ async function handleQuery(req, res) {
       catch (err) { console.warn('[FileDetails Error]', err.message); }
       const detailMap = {};
       details.forEach(d => { if (d && d.publishedfileid) detailMap[d.publishedfileid] = d; });
-      const items = ids.map(id => mapItem(id, detailMap[id]));
+      const items = ids.map(id => mapItem(id, detailMap[id], authors[id] || ''));
       const total = totalCount > 0 ? totalCount : (ids.length >= numperpage ? 50000 : ids.length);
       console.log(`[Query] Returning ${items.length} items, total=${total}`);
       return jsonRes(res, 200, { response: { publishedfiledetails: items, total, total_count: items.length } });
@@ -335,7 +638,7 @@ async function handleQuery(req, res) {
         if (!(d && d.result === 1)) continue;
         const tagSet = new Set((d.tags || []).map(t => String(t.tag || t).toLowerCase()));
         if (!genreOr.some(g => tagSet.has(g))) continue;
-        matched.push(mapItem(id, d));
+        matched.push(mapItem(id, d, (pageData.authors && pageData.authors[id]) || ''));
         if (matched.length >= numperpage) break;
       }
       cursorPage += 1;
@@ -385,7 +688,11 @@ async function handleDetails(res, id) {
     // because POST() helper sets JSON/Form headers but might miss Referer
     const u = new URL(cUrl);
     const buf = await doRequest({
-      hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
+      protocol: u.protocol,
+      hostname: u.hostname,
+      port: u.port ? parseInt(u.port) : undefined,
+      path: u.pathname + u.search,
+      method: 'POST',
       headers: {
         'User-Agent': UA,
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -561,7 +868,7 @@ function ensureDir(p) {
 }
 function runProcess(bin, args, timeoutMs) {
   return new Promise((resolve, reject) => {
-    const cp = spawn(bin, args, { windowsHide: true });
+    const cp = spawn(bin, args, { windowsHide: true, env: Object.assign({}, process.env) });
     let out = '';
     let err = '';
     const timer = setTimeout(() => {
@@ -615,6 +922,53 @@ function listFilesRecursive(root) {
   walk(root);
   return out;
 }
+function findWorkshopItemDir(root, appId, publishedFileId) {
+  const expected = path.join(root, 'steamapps', 'workshop', 'content', String(appId), String(publishedFileId));
+  if (fs.existsSync(expected) && fs.statSync(expected).isDirectory()) return expected;
+  const target = String(publishedFileId);
+  const queue = [root];
+  while (queue.length) {
+    const dir = queue.shift();
+    let ents = [];
+    try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const e of ents) {
+      if (!e.isDirectory()) continue;
+      const fp = path.join(dir, e.name);
+      if (e.name === target) return fp;
+      queue.push(fp);
+    }
+  }
+  return null;
+}
+function extractSteamCmdFailure(steamcmdPath, appId, publishedFileId) {
+  const logFile = path.join(path.dirname(steamcmdPath), 'logs', 'workshop_log.txt');
+  if (!fs.existsSync(logFile)) return '';
+  let text = '';
+  try { text = fs.readFileSync(logFile, 'utf8'); } catch { return ''; }
+  const rows = text.split(/\r?\n/);
+  const item = String(publishedFileId);
+  const app = String(appId);
+  let from = -1;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const line = rows[i] || '';
+    if (line.includes(`Download item ${item} requested by app`)) { from = i; break; }
+  }
+  if (from < 0) return '';
+  const window = rows.slice(from, Math.min(rows.length, from + 40));
+  for (const line of window) {
+    if (!line.includes(`[AppID ${app}]`)) continue;
+    if (line.includes('result : No Connection') || line.includes('Failed downloading') || line.includes('No connection')) {
+      return 'SteamCDN 网络连接失败（No Connection）';
+    }
+    if (line.includes('result : Access Denied')) {
+      return 'Steam 返回 Access Denied（权限不足或需要登录账号）';
+    }
+    if (line.includes('result : Timeout')) {
+      return 'Steam 下载超时（Timeout）';
+    }
+  }
+  return '';
+}
 function detectVideoTag(details) {
   const tags = Array.isArray(details && details.tags) ? details.tags : [];
   return tags.some(t => String((t && t.tag) || t || '').trim().toLowerCase() === 'video');
@@ -650,20 +1004,26 @@ async function ensureSteamCmdReady() {
   return exeFile;
 }
 function resolveLocalAccount(appId) {
-  const p = path.join(__dirname, '..', 'SteamWorshopsTools-v2.0.5', 'data', 'pub_accounts.json');
-  if (!fs.existsSync(p)) return null;
-  try {
-    const j = JSON.parse(fs.readFileSync(p, 'utf8'));
-    const arr = Array.isArray(j && j.Accounts) ? j.Accounts : [];
-    for (const a of arr) {
-      const ids = Array.isArray(a && a.AppIds) ? a.AppIds.map(x => parseInt(x)) : [];
-      if (ids.includes(parseInt(appId))) {
-        const user = String(a.Name || '').trim();
-        const pass = String(a.Password || '').trim();
-        if (user && pass) return { user, pass };
+  const candidates = [
+    path.join(__dirname, '..', 'SteamWorshopsTools-v2.0.5', 'data', 'pub_accounts.json'),
+    path.join(__dirname, '..', 'index', 'SteamWorshopsTools-v2.0.5', 'data', 'pub_accounts.json'),
+    path.join(process.cwd(), 'SteamWorshopsTools-v2.0.5', 'data', 'pub_accounts.json'),
+  ];
+  for (const p of candidates) {
+    if (!fs.existsSync(p)) continue;
+    try {
+      const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+      const arr = Array.isArray(j && j.Accounts) ? j.Accounts : [];
+      for (const a of arr) {
+        const ids = Array.isArray(a && a.AppIds) ? a.AppIds.map(x => parseInt(x)) : [];
+        if (ids.includes(parseInt(appId))) {
+          const user = String(a.Name || '').trim();
+          const pass = String(a.Password || '').trim();
+          if (user && pass) return { user, pass };
+        }
       }
-    }
-  } catch {}
+    } catch {}
+  }
   return null;
 }
 async function downloadViaSteamCmd(publishedFileId, appId, title, options) {
@@ -674,31 +1034,46 @@ async function downloadViaSteamCmd(publishedFileId, appId, title, options) {
   const user = envUser || (localAcc && localAcc.user) || '';
   const pass = envPass || (localAcc && localAcc.pass) || '';
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wallhub-steamcmd-'));
-  const itemDir = path.join(tempRoot, 'steamapps', 'workshop', 'content', String(appId), String(publishedFileId));
-  const attempts = [{ name: 'anonymous', loginArgs: ['+login', 'anonymous'] }];
+  let itemDir = path.join(tempRoot, 'steamapps', 'workshop', 'content', String(appId), String(publishedFileId));
+  const attempts = [];
   if (user && pass) attempts.push({ name: 'account', loginArgs: ['+login', user, pass] });
+  attempts.push({ name: 'anonymous', loginArgs: ['+login', 'anonymous'] });
   let lastErr = '';
+  const variants = [
+    { name: 'normal', itemArgs: ['+workshop_download_item', String(appId), String(publishedFileId)] },
+    { name: 'validate', itemArgs: ['+workshop_download_item', String(appId), String(publishedFileId), 'validate'] },
+  ];
   for (const at of attempts) {
-    try {
-      const args = [
-        '+@ShutdownOnFailedCommand', '1',
-        '+@NoPromptForPassword', '1',
-        '+force_install_dir', tempRoot,
-        ...at.loginArgs,
-        '+workshop_download_item', String(appId), String(publishedFileId),
-        '+quit',
-      ];
-      await runProcess(steamcmd, args, 300000);
-      if (fs.existsSync(itemDir)) {
-        const files = fs.readdirSync(itemDir);
-        if (files.length) break;
+    for (const variant of variants) {
+      try {
+        const args = [
+          '+@ShutdownOnFailedCommand', '1',
+          '+@NoPromptForPassword', '1',
+          '+force_install_dir', tempRoot,
+          ...at.loginArgs,
+          ...variant.itemArgs,
+          '+quit',
+        ];
+        await runProcess(steamcmd, args, 300000);
+        const discovered = findWorkshopItemDir(tempRoot, appId, publishedFileId);
+        if (discovered && fs.existsSync(discovered)) {
+          const files = fs.readdirSync(discovered);
+          if (files.length) {
+            itemDir = discovered;
+            break;
+          }
+        }
+        const reason = extractSteamCmdFailure(steamcmd, appId, publishedFileId);
+        lastErr = `${at.name}/${variant.name} 未产出文件${reason ? `（${reason}）` : ''}`;
+      } catch (e) {
+        const reason = extractSteamCmdFailure(steamcmd, appId, publishedFileId);
+        lastErr = `${at.name}/${variant.name} 失败: ${e.message}${reason ? `（${reason}）` : ''}`;
       }
-      lastErr = `${at.name} 未产出文件`;
-    } catch (e) {
-      lastErr = `${at.name} 失败: ${e.message}`;
+      if (fs.existsSync(itemDir) && fs.readdirSync(itemDir).length) break;
     }
+    if (fs.existsSync(itemDir) && fs.readdirSync(itemDir).length) break;
   }
-  if (!fs.existsSync(itemDir)) throw new Error('SteamCMD 执行完成但未产出工坊文件目录');
+  if (!fs.existsSync(itemDir)) throw new Error(lastErr || 'SteamCMD 执行完成但未产出工坊文件目录');
   if (!fs.readdirSync(itemDir).length) {
     throw new Error(user && pass
       ? `SteamCMD 未下载到文件（${lastErr}）`

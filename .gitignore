@@ -1,1 +1,15 @@
-/wallhub2/
+/dumps/
+/downloads/
+/steamcmd/logs/
+/steamcmd/appcache/
+/steamcmd/config/
+/steamcmd/depotcache/
+/steamcmd/package/
+/steamcmd/steamapps/
+/steamcmd/userdata/
+/steamcmd/update_hosts_cached.vdf
+/steamcmd/libraryfolder.vdf
+/steamcmd/.ntfs_transaction_failed
+/steamcmd/.crash
+/steamcmd/*.old
+/steamcmd/*.zip

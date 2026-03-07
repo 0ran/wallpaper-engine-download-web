@@ -3,221 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Steam 壁纸工坊 · WallHub</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
-
-  :root {
-    --bg:#0a0c10; --bg2:#111318; --bg3:#181c23;
-    --surface:#1c2030; --surface2:#232840;
-    --border:#2a3045;
-    --accent:#4f9cf9; --accent2:#7b5ef8; --accent-glow:rgba(79,156,249,.18);
-    --text:#e8ecf4; --text2:#8a93ab; --text3:#5a6278;
-    --success:#3ddc84; --warn:#f4a742; --danger:#f45c5c;
-    --card-radius:12px;
-    --tr:0.22s cubic-bezier(.4,0,.2,1);
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
-  ::-webkit-scrollbar{width:6px;height:6px}
-  ::-webkit-scrollbar-track{background:var(--bg2)}
-  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-  ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
-
-  /* HEADER */
-  .header{position:sticky;top:0;z-index:100;background:rgba(10,12,16,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:0 20px;height:60px;display:flex;align-items:center;gap:16px}
-  .logo{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--accent);letter-spacing:1px;flex-shrink:0;display:flex;align-items:center}
-  .logo span{color:var(--text);margin-left:8px}
-  .search-wrap{flex:1;max-width:520px;position:relative}
-  .search-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 94px 10px 14px;color:var(--text);font-size:14px;font-family:'Noto Sans SC',sans-serif;outline:none;transition:border-color var(--tr),box-shadow var(--tr);min-height:42px}
-  .search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
-  .search-input::placeholder{color:var(--text3)}
-  .search-btn{position:absolute;right:7px;top:50%;transform:translateY(-50%);background:#2db86b;border:1px solid #2db86b;cursor:pointer;color:#fff;padding:0 14px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all var(--tr);font-size:12px;line-height:1;height:32px}
-  .search-btn:hover{color:#fff;border-color:#26a860;background:#26a860}
-  .srv-status{margin-left:auto;font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap}
-  .dot{width:7px;height:7px;border-radius:50%;background:#444;display:inline-block;transition:background .3s}
-  .dot.ok{background:var(--success)}.dot.err{background:var(--danger)}
-
-  /* FILTER BAR */
-  .filter-bar{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;z-index:90;position:relative}
-  .fg{display:flex;align-items:center;gap:6px}
-  .fl{font-size:12px;color:var(--text3);font-weight:500;white-space:nowrap}
-  .sel{background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;font-family:'Noto Sans SC',sans-serif;padding:5px 28px 5px 10px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a6278' stroke-width='2'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;transition:border-color var(--tr),box-shadow var(--tr)}
-  .sel:focus,.sel:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
-  .sel option{background:var(--bg3)}
-  .fdiv{width:1px;height:24px;background:var(--border)}
-  .filter-btn{background:linear-gradient(135deg,var(--surface),var(--surface2));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:'Noto Sans SC',sans-serif;padding:6px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all var(--tr);margin-left:auto}
-  .filter-btn:hover{border-color:var(--accent);background:var(--surface2);box-shadow:0 0 0 2px var(--accent-glow)}
-  .badge{background:var(--accent);color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;display:none}
-  .filter-btn.active .badge{display:inline-block}
-
-  /* SIDEBAR */
-  .sb-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;opacity:0;pointer-events:none;transition:opacity var(--tr)}
-  .sb-ov.open{opacity:1;pointer-events:all}
-  .sidebar{position:fixed;top:0;right:-340px;width:320px;max-width:90vw;height:100vh;background:var(--bg2);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transition:right .3s cubic-bezier(.4,0,.2,1);overflow:hidden}
-  .sidebar.open{right:0}
-  .sb-head{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-  .sb-title{font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
-  .xbtn{background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text2);cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;transition:all var(--tr);font-size:18px}
-  .xbtn:hover{color:var(--danger);border-color:var(--danger)}
-  .sb-body{flex:1;overflow-y:auto;padding:16px 20px}
-  .sb-sec{margin-bottom:20px}
-  .sb-sec-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
-  .genre-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-  .gc{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;cursor:pointer;transition:all var(--tr);font-size:12px;color:var(--text2);user-select:none}
-  .gc:hover{border-color:var(--accent);color:var(--text);background:var(--surface)}
-  .gc.sel2{background:rgba(79,156,249,.15);border-color:var(--accent);color:var(--accent)}
-  .gc-chk{width:14px;height:14px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all var(--tr);background:var(--bg2)}
-  .gc.sel2 .gc-chk{background:var(--accent);border-color:var(--accent)}
-  .gc.sel2 .gc-chk::after{content:'✓';font-size:9px;color:#fff;font-weight:700}
-  .sb-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0}
-  .btn-p{flex:1;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:8px;color:#fff;font-size:14px;font-family:'Noto Sans SC',sans-serif;font-weight:500;padding:10px;cursor:pointer;transition:opacity var(--tr),transform var(--tr)}
-  .btn-p:hover{opacity:.9;transform:translateY(-1px)}
-  .btn-s{background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:13px;font-family:'Noto Sans SC',sans-serif;padding:10px 16px;cursor:pointer;transition:all var(--tr)}
-  .btn-s:hover{color:var(--text);border-color:var(--text3)}
-
-  /* MAIN */
-  .main{padding:20px;max-width:1440px;margin:0 auto}
-  .sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px}
-  .sec-info{display:flex;align-items:center;gap:10px}
-  .sec-title{font-size:15px;font-weight:600;color:var(--text)}
-  .res-count{font-size:13px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:20px}
-  .view-tog{display:flex;gap:4px}
-  .vbtn{background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text3);cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;transition:all var(--tr);font-size:16px}
-  .vbtn.active,.vbtn:hover{background:var(--surface);border-color:var(--accent);color:var(--accent)}
-
-  /* STATES */
-  .loading-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:16px;color:var(--text3)}
-  .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:12px;color:var(--text3);font-size:14px;text-align:center}
-  .empty-icon{font-size:48px;opacity:.4}
-  .proxy-tip{max-width:560px;background:var(--bg2);border:1px solid rgba(244,92,92,.35);border-radius:12px;padding:16px 16px 14px;text-align:left}
-  .proxy-title{font-size:16px;font-weight:700;color:#ffb3b3;display:flex;align-items:center;gap:8px;margin-bottom:10px}
-  .proxy-desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:10px;word-break:break-word}
-  .proxy-steps{display:grid;gap:6px;margin-bottom:12px}
-  .proxy-step{font-size:12px;color:var(--text2);line-height:1.6;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px}
-  .proxy-actions{display:flex;gap:8px;flex-wrap:wrap}
-  .proxy-btn{background:var(--accent);border:none;border-radius:8px;color:#fff;padding:9px 14px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600}
-  .proxy-btn.alt{background:var(--bg3);border:1px solid var(--border);color:var(--text2)}
-
-  /* GRID */
-  .wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-  .wgrid.lv{grid-template-columns:1fr}
-
-  /* CARD */
-  .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--card-radius);overflow:hidden;cursor:pointer;transition:transform var(--tr),border-color var(--tr),box-shadow var(--tr);position:relative;animation:cardIn .35s ease both}
-  @keyframes cardIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
-  .card:hover{transform:translateY(-3px);border-color:rgba(79,156,249,.4);box-shadow:0 8px 30px rgba(0,0,0,.4),0 0 0 1px rgba(79,156,249,.15)}
-  .card.lv{display:flex;align-items:center}
-  .card-thumb{position:relative;width:100%;padding-top:100%;background:var(--bg3);overflow:hidden;flex-shrink:0}
-  .card.lv .card-thumb{width:120px;padding-top:0;height:120px}
-  .card-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .4s}
-  .card:hover .card-thumb img{transform:scale(1.05)}
-  .skel{position:absolute;inset:0;background:linear-gradient(90deg,var(--bg3) 25%,var(--surface) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
-  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-  .type-badge{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.72);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:2px 7px;font-size:10px;font-weight:600;color:#fff;letter-spacing:.5px;text-transform:uppercase}
-  .type-badge.video{border-color:rgba(79,156,249,.5);color:var(--accent)}
-  .type-badge.scene{border-color:rgba(61,220,132,.5);color:var(--success)}
-  .card-body{padding:10px 12px 12px;flex:1;min-width:0}
-  .card-title{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px;line-height:1.4}
-  .card.lv .card-title{white-space:normal;display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;margin-bottom:6px}
-  .card-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .cstat{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text3)}
-  .card-foot{padding:0 12px 12px;display:flex;gap:6px;align-items:center}
-  .card.lv .card-foot{padding:0 14px 0 0;flex-direction:column;gap:6px;flex-shrink:0}
-
-  /* BUTTONS */
-  .sub-btn{flex:1;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:7px;color:#fff;font-size:13px;font-family:'Noto Sans SC',sans-serif;font-weight:500;padding:8px 10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all var(--tr);white-space:nowrap}
-  .sub-btn:hover{box-shadow:0 4px 15px rgba(79,156,249,.4);transform:translateY(-1px)}
-  .sub-btn:active{transform:none}
-  .sub-btn.dling{background:linear-gradient(135deg,#3ddc84,#2db86b);pointer-events:none}
-  .sub-btn.done{background:var(--surface);border:1px solid var(--success);color:var(--success);pointer-events:none}
-
-  /* PAGINATION */
-  .pagination{display:flex;align-items:center;justify-content:center;gap:6px;padding:30px 0 20px;flex-wrap:wrap}
-  .pbtn{background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:13px;font-family:'Noto Sans SC',sans-serif;padding:7px 14px;cursor:pointer;min-width:40px;text-align:center;transition:all var(--tr);display:flex;align-items:center;gap:4px}
-  .pbtn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--surface)}
-  .pbtn.cur{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff;font-weight:600}
-  .pbtn:disabled{opacity:.35;cursor:not-allowed}
-
-  /* MODAL */
-  .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
-  .modal-ov.open{opacity:1;pointer-events:all}
-  .modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;max-width:700px;width:100%;overflow:hidden;transform:scale(.95) translateY(10px);transition:transform .25s cubic-bezier(.4,0,.2,1);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.7)}
-  .modal-ov.open .modal{transform:none}
-  .modal-head{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-shrink:0}
-  .modal-title{font-size:17px;font-weight:600;line-height:1.4}
-  .modal-sub{font-size:12px;color:var(--text3);margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .modal-body{padding:20px 24px;overflow-y:auto;flex:1}
-  .modal-img{width:100%;border-radius:10px;margin-bottom:16px;aspect-ratio:1/1;object-fit:cover;background:var(--bg3);display:block}
-
-  /* Stats grid – 3 cols */
-  .mstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
-  .msi{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 10px;text-align:center;transition:border-color var(--tr)}
-  .msi:hover{border-color:rgba(79,156,249,.3)}
-  .msi-ico{font-size:20px;margin-bottom:4px;line-height:1}
-  .msi-val{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;word-break:break-all}
-  .msi-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
-
-  .modal-desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px;background:var(--bg3);border-radius:8px;padding:12px 14px;border:1px solid var(--border);white-space:pre-wrap;max-height:110px;overflow-y:auto}
-  .modal-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
-  .tag-chip{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text2)}
-
-  /* Comments */
-  .cmt-sec{border-top:1px solid var(--border);padding-top:16px}
-  .cmt-title{font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text);display:flex;align-items:center;gap:6px}
-  .cmt-list{display:flex;flex-direction:column;gap:10px;max-height:340px;overflow-y:auto;padding-right:2px}
-  .cmt{background:var(--bg3);border:1px solid var(--border);padding:11px 13px;border-radius:10px}
-  .cmt-head{display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px}
-  .cmt-author{color:var(--accent);font-weight:600}
-  .cmt-date{color:var(--text3)}
-  .cmt-text{font-size:13px;color:var(--text2);line-height:1.55;white-space:pre-wrap;word-break:break-word}
-  .cmt-empty{color:var(--text3);font-size:13px;text-align:center;padding:20px}
-  .cmt-spin{display:flex;align-items:center;gap:8px;color:var(--text3);font-size:13px;padding:10px}
-  .spinner-sm{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
-
-  .modal-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0}
-  .modal-sub-btn{flex:1;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:9px;color:#fff;font-size:14px;font-family:'Noto Sans SC',sans-serif;font-weight:600;padding:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:all var(--tr)}
-  .modal-sub-btn:hover{box-shadow:0 6px 20px rgba(79,156,249,.4);transform:translateY(-1px)}
-  .steam-link{background:var(--bg3);border:1px solid var(--border);border-radius:9px;color:var(--text2);font-size:13px;font-family:'Noto Sans SC',sans-serif;padding:12px 18px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px;transition:all var(--tr)}
-  .steam-link:hover{color:var(--text);border-color:var(--text3)}
-
-  /* TOAST */
-  .toast-wrap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
-  .toast{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 20px;font-size:14px;color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px;animation:tIn .3s ease,tOut .3s ease 2.2s both;white-space:nowrap}
-  @keyframes tIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-  @keyframes tOut{from{opacity:1}to{opacity:0}}
-  .toast.info{border-color:rgba(79,156,249,.4)} .toast.info .ti{color:var(--accent)}
-  .toast.ok{border-color:rgba(61,220,132,.4)} .toast.ok .ti{color:var(--success)}
-  .toast.warn{border-color:rgba(244,167,66,.4)} .toast.warn .ti{color:var(--warn)}
-
-  /* RESPONSIVE */
-  @media(max-width:768px){
-    .header{height:auto;min-height:56px;padding:10px 14px;gap:8px;flex-wrap:wrap}
-    .logo{font-size:18px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .search-wrap{max-width:none;flex:1 0 100%;order:3}
-    .filter-bar{padding:8px 14px;gap:8px}
-    .fl{font-size:11px}
-    .sel{font-size:12px;padding:5px 24px 5px 8px}
-    .main{padding:14px}
-    .wgrid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px}
-    .mstats{grid-template-columns:repeat(2,1fr)}
-    .modal-head{padding:16px 18px 14px}
-    .modal-body{padding:16px 18px}
-    .modal-foot{padding:14px 18px;flex-wrap:wrap}
-    .modal-desc{font-size:12px;line-height:1.65;max-height:38vh;padding:10px 12px}
-    .srv-status{display:none}
-  }
-  @media(max-width:480px){
-    .logo{font-size:16px}
-    .logo span{display:none}
-    .wgrid{grid-template-columns:repeat(2,1fr);gap:8px}
-    .card-body{padding:8px 10px 10px}
-    .card-foot{padding:0 10px 10px}
-    .mstats{grid-template-columns:1fr 1fr}
-  }
-</style>
+<title>WE · Steam 壁纸工坊</title>
+<link rel="stylesheet" href="/assets/css/app.css">
 </head>
 <body>
 
@@ -225,14 +12,38 @@
   <div class="logo">Wallpaper Engine <span>Hub</span></div>
   <div class="search-wrap">
     <input class="search-input" type="text" id="searchInput" placeholder="搜索壁纸名称..." autocomplete="off">
-    <button class="search-btn" id="searchBtn">Search</button>
+    <button class="search-btn" id="searchBtn" title="搜索" aria-label="搜索">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    </button>
   </div>
-  <div class="srv-status"><span class="dot" id="dot"></span><span id="srvTxt">连接中...</span></div>
+  <div class="header-actions">
+    <div class="actions-main">
+      <div class="lang-switch" role="group" aria-label="Language switch">
+        <button class="lang-btn active" id="langBtn" type="button" title="切换语言" aria-label="切换语言">中</button>
+      </div>
+      <button class="head-theme-btn" id="themeBtn" title="切换主题" aria-label="切换主题">
+        <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.8"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+        <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.8A8.8 8.8 0 1 1 9.2 4a7.3 7.3 0 0 0 10.8 10.8Z"/><path d="M16.8 3.8v2.2M15.7 4.9H18"/></svg>
+      </button>
+      <button class="head-help-btn" id="usageBtn" title="说明" aria-label="说明">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v15H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M4 6.5V21"/><path d="M8 8h8"/><path d="M8 12h8"/></svg>
+      </button>
+    </div>
+    <span class="actions-divider" aria-hidden="true"></span>
+    <div class="actions-social">
+      <a class="head-icon-btn" href="https://github.com/0ran/wallpaper-engine-download-web" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A12 12 0 0 0 8.2 23.9c.6.1.8-.2.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.6-1.3-1.3-1.7-1.3-1.7-1.1-.8.1-.8.1-.8 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.4-1.3-5.4-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.4 5.9.4.3.8 1 .8 2.1v3.1c0 .4.2.7.8.6A12 12 0 0 0 12 .5Z"/></svg>
+      </a>
+      <a class="head-icon-btn" href="https://space.bilibili.com/111174060" target="_blank" rel="noopener noreferrer" title="哔哩哔哩" aria-label="哔哩哔哩主页">
+        <svg width="18" height="18" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true"><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+      </a>
+    </div>
+  </div>
 </header>
 
 <!-- Filter Bar -->
 <div class="filter-bar">
-  <div class="fg">
+  <div class="fg" id="sortGrp">
     <span class="fl">排序依据</span>
     <select class="sel" id="sortSel">
       <option value="trend">最热门</option>
@@ -243,40 +54,40 @@
   </div>
   <!-- 时间：仅最热门时显示 -->
   <div class="fg" id="daysGrp">
-    <span class="fl">时间</span>
+    <span class="fl">时间排序</span>
     <select class="sel" id="daysSel">
       <option value="1">今天</option>
-      <option value="7">一周</option>
-      <option value="30" selected>30天</option>
+      <option value="7" selected>一周</option>
+      <option value="30">30天</option>
       <option value="90">三个月</option>
       <option value="180">半年</option>
-      <option value="365">1年</option>
+      <option value="365">一年</option>
       <option value="0">有史以来</option>
     </select>
   </div>
   <div class="fdiv"></div>
-  <div class="fg">
-    <span class="fl">类型</span>
+  <div class="fg" id="typeGrp">
+    <span class="fl">类型选择</span>
     <select class="sel" id="typeSel">
-      <option value="" selected>全部</option>
-      <option value="Scene">场景 Scene</option>
-      <option value="Video">视频 Video</option>
-      <option value="Web">网站 Web</option>
-      <option value="Application">应用 Application</option>
+      <option value="">全部</option>
+      <option value="Scene">场景</option>
+      <option value="Video" selected>视频</option>
+      <option value="Web">网站</option>
+      <option value="Application">应用</option>
     </select>
   </div>
-  <div class="fg">
+  <div class="fg" id="ratingGrp">
     <span class="fl">年龄评级</span>
     <select class="sel" id="ratingSel">
       <option value="">全部</option>
-      <option value="Everyone">全年龄 Everyone</option>
-      <option value="Questionable">家长指导级 Questionable</option>
-      <option value="Mature">限制成人级 Mature</option>
+      <option value="Everyone">全年龄</option>
+      <option value="Questionable">家长指导级</option>
+      <option value="Mature">限制成人级</option>
     </select>
   </div>
   <button class="filter-btn" id="filterBtn" onclick="openSB()">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
-    Genre 筛选 <span class="badge" id="fbadge">0</span>
+    筛选 <span class="badge" id="fbadge">0</span>
   </button>
 </div>
 
@@ -292,7 +103,6 @@
   </div>
   <div class="sb-body">
     <div class="sb-sec">
-      <div class="sb-sec-title">Genre 风格筛选</div>
       <div class="genre-grid" id="genreGrid"></div>
     </div>
   </div>
@@ -359,516 +169,28 @@
 
 <div class="toast-wrap" id="toasts"></div>
 
-<script>
-/* ================================================================
-   CONFIG & STATE
-================================================================ */
-const APPID = 431960, PAGE_SIZE = 30;
-const PROXY_DOMAINS = ['steamcommunity.com', 'api.steampowered.com', 'steamusercontent.com'];
-
-const S = {
-  page:1, totalPages:1, totalItems:0,
-  loading:false, view:'grid',
-  items:[],
-  f:{ search:'', sort:'trend', days:'30', type:'', rating:'', genres:[] }
-};
-
-/* ================================================================
-   GENRES
-================================================================ */
-const GENRES=[
-  {id:'Abstract',n:'抽象'},{id:'Animal',n:'动物'},{id:'Anime',n:'日本动画'},
-  {id:'Cartoon',n:'卡通'},{id:'CGI',n:'CGI'},{id:'Cyberpunk',n:'赛博朋克'},
-  {id:'Fantasy',n:'幻想'},{id:'Game',n:'游戏'},{id:'Girls',n:'女孩们'},
-  {id:'Guys',n:'伙计们'},{id:'Landscape',n:'景观'},{id:'Medieval',n:'中世纪'},
-  {id:'Memes',n:'表情包'},{id:'MMD',n:'MMD'},{id:'Music',n:'音乐'},
-  {id:'Nature',n:'自然'},{id:'Pixel art',n:'像素艺术'},{id:'Relaxing',n:'放松'},
-  {id:'Retro',n:'复古'},{id:'Sci-Fi',n:'科幻'},{id:'Sports',n:'运动'},
-  {id:'Technology',n:'科技'},{id:'Television',n:'电视'},{id:'Vehicle',n:'车辆'},
-  {id:'Unspecified',n:'未指定'},
-];
-
-/* ================================================================
-   INIT
-================================================================ */
-document.addEventListener('DOMContentLoaded', ()=>{
-  renderGenreGrid();
-  setupEvents();
-  syncDaysVisible();
-  checkServer();
-  load();
-});
-
-function setupEvents(){
-  document.getElementById('searchInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
-  document.getElementById('searchBtn').addEventListener('click', doSearch);
-  document.getElementById('sortSel').addEventListener('change', e=>{ S.f.sort=e.target.value; S.page=1; syncDaysVisible(); load(); });
-  document.getElementById('daysSel').addEventListener('change', e=>{ S.f.days=e.target.value; S.page=1; load(); });
-  document.getElementById('typeSel').addEventListener('change', e=>{ S.f.type=e.target.value; S.page=1; load(); });
-  document.getElementById('ratingSel').addEventListener('change', e=>{ S.f.rating=e.target.value; S.page=1; load(); });
-}
-
-function doSearch(){
-  S.f.search = document.getElementById('searchInput').value.trim();
-  S.page = 1; load();
-}
-
-/* 只有"最热门"时才显示时间下拉 */
-function syncDaysVisible(){
-  document.getElementById('daysGrp').style.display = S.f.sort==='trend' ? '' : 'none';
-}
-
-/* ================================================================
-   GENRES
-   UI：默认全选，支持多选/取消
-   逻辑：单选时走 requiredtags；多选时走 genre_or 交给后端做 OR 过滤
-================================================================ */
-let activeGenres = new Set(GENRES.map(g=>g.id));
-
-function renderGenreGrid(){
-  document.getElementById('genreGrid').innerHTML = GENRES.map(g=>`
-    <div class="gc ${activeGenres.has(g.id) ? 'sel2' : ''}"
-         onclick="toggleGenre('${g.id}')">
-      <div class="gc-chk"></div><span>${g.n}</span>
-    </div>`).join('');
-  updateBadge();
-}
-
-function toggleGenre(id){
-  if(activeGenres.has(id)) activeGenres.delete(id);
-  else activeGenres.add(id);
-  S.f.genres = Array.from(activeGenres);
-  renderGenreGrid();
-}
-
-function updateBadge(){
-  const cnt = activeGenres.size;
-  const all = cnt === GENRES.length;
-  document.getElementById('fbadge').textContent = all ? '全' : String(cnt);
-  document.getElementById('filterBtn').classList.toggle('active', !all);
-  const btn = document.getElementById('genreToggleBtn');
-  if (btn) btn.textContent = all ? '清除' : '全选';
-}
-function openSB(){ document.getElementById('sb').classList.add('open'); document.getElementById('sbOv').classList.add('open'); document.body.style.overflow='hidden'; }
-function closeSB(){ document.getElementById('sb').classList.remove('open'); document.getElementById('sbOv').classList.remove('open'); document.body.style.overflow=''; }
-function toggleGenresAll(){
-  if (activeGenres.size === GENRES.length) activeGenres = new Set();
-  else activeGenres = new Set(GENRES.map(g=>g.id));
-  S.f.genres = Array.from(activeGenres);
-  renderGenreGrid();
-}
-function applyFilters(){ closeSB(); S.page=1; load(); }
-
-/* ================================================================
-   VIEW
-================================================================ */
-function setView(v){
-  S.view=v;
-  document.getElementById('vgrid').classList.toggle('active',v==='grid');
-  document.getElementById('vlist').classList.toggle('active',v==='list');
-  renderItems(S.items);
-}
-
-/* ================================================================
-   BUILD PARAMS
-================================================================ */
-function buildParams(){
-  const f = S.f;
-  const params = {
-    appid: APPID,
-    query_type: {trend:1,mostrecent:2,lastupdated:21,totaluniquesubscribers:16}[f.sort]||1,
-    page: S.page,
-    numperpage: PAGE_SIZE,
-  };
-  if(f.search) params.search_text = f.search;
-  if(f.days && f.sort==='trend' && f.days!=='0') params.days = parseInt(f.days);
-
-  // requiredtags：type / rating 直接传；genre 多选时仅在“单个选中”时透传到 Steam
-  const tags=[];
-  if(f.type)   tags.push(f.type);
-  if(f.rating) tags.push(f.rating);
-  const validGenres = (f.genres||[]).filter(g=>GENRES.some(x=>x.id===g));
-  if(validGenres.length === 1) tags.push(validGenres[0]);
-  if(validGenres.length > 1 && validGenres.length < GENRES.length){
-    validGenres.forEach((g,i)=>{ params[`genre_or[${i}]`] = g; });
-  }
-
-  tags.forEach((t,i)=>{ params[`requiredtags[${i}]`]=t; });
-
-  return params;
-}
-
-/* ================================================================
-   LOAD
-================================================================ */
-async function load(){
-  if(S.loading) return;
-  S.loading=true;
-  showLoading();
-  try {
-    const res  = await fetch('/api/steam/query',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({params:buildParams()})
-    });
-    if(!res.ok){
-      let serverMsg='';
-      try{
-        const j = await res.json();
-        serverMsg = j && (j.error || j.message) ? String(j.error || j.message) : '';
-      }catch{}
-      throw new Error(serverMsg || `服务器 ${res.status}`);
-    }
-    const data = await res.json();
-    const resp = data.response||data;
-    const list = resp.publishedfiledetails||[];
-
-    if(!list.length){
-      document.getElementById('resCnt').textContent='0 个结果';
-      if(canShowProxyGuideByFilters()){
-        showError('未获取到壁纸列表，当前网络可能无法访问 Steam 社区服务。');
-      }else{
-        showEmpty('未找到匹配的壁纸，请尝试修改筛选条件');
-      }
-      document.getElementById('pgn').innerHTML='';
-    } else {
-      S.items      = list;
-      S.totalItems = parseInt(resp.total) || list.length;
-      // Steam workshop browse 最多支持翻到第 999 页
-      S.totalPages = Math.min(999, Math.max(1, Math.ceil(S.totalItems / PAGE_SIZE)));
-      const dispTotal = S.totalItems >= 50000 ? '50,000+' : S.totalItems.toLocaleString();
-      document.getElementById('resCnt').textContent = `约 ${dispTotal} 个 · 共 ${S.totalPages} 页`;
-      renderItems(S.items);
-      renderPagination();
-    }
-  } catch(err){
-    console.error(err);
-    showError(err.message);
-  } finally { S.loading=false; }
-}
-
-/* ================================================================
-   RENDER
-================================================================ */
-function showLoading(){
-  document.getElementById('wcon').innerHTML=`
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <span style="font-size:14px;color:var(--text3)">正在抓取 Steam 创意工坊...</span>
-      <span style="font-size:12px;color:var(--text3);margin-top:2px">抓取列表 → 批量获取详情数据</span>
-    </div>`;
-  document.getElementById('pgn').innerHTML='';
-}
-function showEmpty(msg){
-  document.getElementById('wcon').innerHTML=`
-    <div class="empty-state"><div class="empty-icon">🖼️</div><div>${msg}</div></div>`;
-}
-function showError(msg){
-  const content = `
-      <div style="font-size:44px">⚠️</div>
-      <div style="color:var(--danger);font-size:16px;font-weight:600">加载失败</div>
-      <div style="font-size:13px;color:var(--text3);max-width:420px">${esc(msg)}</div>
-      <button onclick="load()" style="background:var(--accent);border:none;border-radius:8px;color:#fff;padding:9px 22px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;margin-top:4px">🔄 重试</button>
-      ${proxyTipHtml(msg)}
-  `;
-  document.getElementById('wcon').innerHTML=`
-    <div class="empty-state" style="gap:14px">${content}</div>`;
-  document.getElementById('resCnt').textContent='失败';
-}
-function canShowProxyGuideByFilters(){
-  return !S.f.search && !S.f.type && !S.f.rating && (!S.f.genres || !S.f.genres.length || S.f.genres.length===GENRES.length);
-}
-function proxyTipHtml(msg){
-  return `
-    <div class="proxy-tip">
-      <div class="proxy-title">🌐 当前网络可能受限，请开启代理后再访问</div>
-      <div class="proxy-desc">检测到请求 Steam 社区服务失败。请先开启 VPN/代理，再点击重试。</div>
-      <div class="proxy-desc">原始错误：${esc(msg || '网络请求失败')}</div>
-      <div class="proxy-actions">
-        <button class="proxy-btn" onclick="load()">已开启代理，立即重试</button>
-        <button class="proxy-btn alt" onclick="copyProxyDomains()">复制代理域名</button>
+<div class="usage-ov" id="usageOv" onclick="usageOvClick(event)">
+  <div class="usage-card">
+    <div class="usage-head">
+      <div class="usage-title">使用说明</div>
+      <button class="usage-close" onclick="closeUsage()">×</button>
+    </div>
+    <div class="usage-body">
+      <div class="usage-topic">
+        <div class="usage-topic-text">此项目不需要登陆Steam账号，即可下载 wallpaper engine 所有壁纸项目。</div>
       </div>
-    </div>`;
-}
-function copyProxyDomains(){
-  const txt = PROXY_DOMAINS.join('\n');
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).then(()=>toast('代理域名已复制','ok')).catch(()=>toast('复制失败，请手动复制','warn'));
-    return;
-  }
-  toast('当前环境不支持自动复制，请手动复制域名','warn');
-}
-
-function renderItems(items){
-  if(!items||!items.length){ showEmpty('暂无壁纸数据'); return; }
-  const isL = S.view==='list';
-  const con  = document.getElementById('wcon');
-  con.innerHTML=`<div class="wgrid ${isL?'lv':''}">${items.map((it,i)=>cardHtml(it,isL,i)).join('')}</div>`;
-  // Lazy load images - only load if src is non-empty
-  con.querySelectorAll('img[data-src]').forEach(img=>{
-    const src = img.dataset.src;
-    if (!src || src === 'PLACEHOLDER') {
-      img.src = PLACEHOLDER;
-      img.previousElementSibling?.remove();
-      return;
-    }
-    const ob=new IntersectionObserver(es=>{
-      es.forEach(e=>{
-        if(e.isIntersecting){
-          const el=e.target;
-          const realSrc = el.dataset.src;
-          if (!realSrc) { el.src=PLACEHOLDER; el.previousElementSibling?.remove(); ob.disconnect(); return; }
-          el.src = realSrc;
-          el.onload = () => { el.previousElementSibling?.remove(); };
-          el.onerror = () => { el.previousElementSibling?.remove(); el.src = PLACEHOLDER; el.style.opacity='.4'; };
-          ob.disconnect();
-        }
-      });
-    },{rootMargin:'150px'});
-    ob.observe(img);
-  });
-}
-
-/* Placeholder SVG for missing thumbnails */
-const PLACEHOLDER = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Crect width='320' height='320' fill='%231c2030'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%235a6278' font-size='14'%3E🖼%3C/text%3E%3C/svg%3E`;
-
-function cardHtml(item, isL, idx){
-  const fid   = item.publishedfileid;
-  const title = item.title || '未命名壁纸';
-  const thumb = item.preview_url || '';
-  const type  = getType(item);
-  const subs  = fmtN(item.subscriptions||item.lifetime_subscriptions||0);
-  const views = fmtN(item.views||0);
-  const delay = Math.min(idx*25,400);
-
-  return `
-  <div class="card ${isL?'lv':''}" style="animation-delay:${delay}ms" onclick="openModal('${fid}')">
-    <div class="card-thumb">
-      <div class="skel"></div>
-      <img data-src="${thumb||'PLACEHOLDER'}" data-id="${fid}" alt="${esc(title)}" loading="lazy">
-      <span class="type-badge ${type.toLowerCase()}">${type}</span>
+      <div class="usage-item limit"><b>访问限制：</b><br>使用本工具需开启网络代理，否则无法访问 Steam 创意工坊资源。</div>
+      <div class="usage-item pack"><b>下载与打包规则：</b><br>场景类 / 页面类 / 程序类壁纸：下载后自动打包为 .zip 压缩文件，需解压后访问；<br>视频类壁纸：仅下载原始视频文件，无压缩打包流程，下载后可直接播放。</div>
+      <div class="usage-item dev"><b>开发说明：</b><br>本项目全程依托人工智能辅助完成构建，发布者未审阅、未编写任何一行代码内容，若与其他项目存在代码雷同，均属巧合。</div>
+      <div class="usage-note">本工具并非用于规避 Wallpaper Engine 正版购买权益，严格遵循非商用、个人自用的使用场景。</div>
     </div>
-    <div class="card-body">
-      <div class="card-title" title="${esc(title)}">${esc(title)}</div>
-      <div class="card-meta">
-        <span class="cstat">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          ${subs}
-        </span>
-        <span class="cstat">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          ${views}
-        </span>
-      </div>
-    </div>
-    <div class="card-foot">
-      <button class="sub-btn" id="sub-${fid}" data-fid="${fid}" data-title="${esc(title)}" onclick="event.preventDefault();event.stopPropagation();dlWall(this.dataset.fid,this.dataset.title);return false;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        订阅
-      </button>
-    </div>
-  </div>`;
-}
+  </div>
+</div>
 
-/* ================================================================
-   PAGINATION
-================================================================ */
-function renderPagination(){
-  const pg=document.getElementById('pgn'), cur=S.page, tot=S.totalPages;
-  if(tot<=1){ pg.innerHTML=''; return; }
-  let pages=[1];
-  if(cur>3) pages.push('…');
-  for(let i=Math.max(2,cur-1);i<=Math.min(tot-1,cur+1);i++) pages.push(i);
-  if(cur<tot-2) pages.push('…');
-  if(tot>1) pages.push(tot);
-  pg.innerHTML=`
-    <button class="pbtn" onclick="goPage(${cur-1})" ${cur===1?'disabled':''}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>上一页</button>
-    ${pages.map(p=>p==='…'
-      ?`<span class="pbtn" style="pointer-events:none;opacity:.4">…</span>`
-      :`<button class="pbtn ${p===cur?'cur':''}" onclick="goPage(${p})">${p}</button>`
-    ).join('')}
-    <button class="pbtn" onclick="goPage(${cur+1})" ${cur===tot?'disabled':''}>下一页<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>`;
-}
-function goPage(p){ if(p<1||p>S.totalPages||p===S.page) return; S.page=p; window.scrollTo({top:0,behavior:'smooth'}); load(); }
+<footer class="site-disclaimer" hidden>
+  <div class="disclaimer-inner" id="siteDisclaimerText">免责声明：本项目在人工智能辅助下完成开发与整理，发布者未逐行人工审阅或手写核心代码；若与其他项目存在相似实现，可能属于技术方案趋同。项目仅供学习交流，请勿用于商业用途或侵权场景。</div>
+</footer>
 
-/* ================================================================
-   MODAL
-================================================================ */
-function openModal(id){
-  const item = S.items.find(w=>w.publishedfileid===id);
-  if(!item) return;
-
-  const thumb = item.preview_url||'';
-  document.getElementById('mTitle').textContent = item.title||'未命名壁纸';
-  document.getElementById('mSub').innerHTML = `<span>🆔 ${id}</span><span>作者: 加载中...</span>`;
-  document.getElementById('mImg').src   = thumb||PLACEHOLDER;
-  document.getElementById('mImg').style.display = '';
-  document.getElementById('mDesc').textContent = item.short_description||'加载详细描述中...';
-  document.getElementById('mSteam').href = `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`;
-  document.getElementById('mSubBtn').onclick = (e)=>{ e.preventDefault(); e.stopPropagation(); closeModal(); dlWall(id, item.title); };
-
-  // Initial stats from list data
-  renderStats({
-    subs:  fmtN(item.subscriptions||item.lifetime_subscriptions||0),
-    favs:  fmtN(item.favorited||item.lifetime_favorited||0),
-    views: fmtN(item.views||0),
-    size:  item.file_size ? fmtBytes(parseInt(item.file_size)) : '加载中...',
-    upd:   item.time_updated ? fmtTime(item.time_updated) : '加载中...',
-    id,
-  });
-
-  // Tags
-  const tags=(item.tags||[]).map(t=>t.tag||t).filter(Boolean);
-  document.getElementById('mTags').innerHTML = tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('');
-
-  // Comments loading
-  document.getElementById('mCmts').innerHTML=`<div class="cmt-spin"><div class="spinner-sm"></div>正在抓取留言...</div>`;
-
-  document.getElementById('mOv').classList.add('open');
-  document.body.style.overflow='hidden';
-
-  // Fetch details
-  fetch(`/api/steam/details?id=${id}`)
-    .then(r=>{ if(!r.ok) throw new Error(`${r.status}`); return r.json(); })
-    .then(d=>{
-      // Update image if better
-      if(d.preview_url) document.getElementById('mImg').src=d.preview_url;
-      // Update description
-      if(d.description) document.getElementById('mDesc').textContent=d.description;
-      // Update subtitle
-      if(d.author) document.getElementById('mSub').innerHTML=`<span>🆔 ${id}</span><span>作者: ${esc(d.author)}</span>`;
-      // Update tags
-      if(d.tags && d.tags.length) document.getElementById('mTags').innerHTML=d.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('');
-      // Update stats
-      renderStats({
-        subs:  d.subscriptions || fmtN(item.subscriptions||0),
-        favs:  d.favorited     || fmtN(item.favorited||0),
-        views: d.views         || fmtN(item.views||0),
-        size:  d.file_size     || '未知',
-        upd:   d.time_updated  || '未知',
-        id,
-      });
-      // Comments
-      renderCmts(d.comments||[]);
-    })
-    .catch(err=>{ console.warn('[Detail]',err.message); renderCmts([]); });
-}
-
-function renderStats(d){
-  document.getElementById('mStats').innerHTML=`
-    <div class="msi"><div class="msi-ico">❤️</div><div class="msi-val">${d.subs}</div><div class="msi-lbl">订阅数</div></div>
-    <div class="msi"><div class="msi-ico">⭐</div><div class="msi-val">${d.favs}</div><div class="msi-lbl">收藏数</div></div>
-    <div class="msi"><div class="msi-ico">👁️</div><div class="msi-val">${d.views}</div><div class="msi-lbl">浏览量</div></div>
-    <div class="msi"><div class="msi-ico">📦</div><div class="msi-val">${d.size}</div><div class="msi-lbl">文件大小</div></div>
-    <div class="msi"><div class="msi-ico">🕒</div><div class="msi-val" style="font-size:11px">${d.upd}</div><div class="msi-lbl">最后更新</div></div>
-    <div class="msi"><div class="msi-ico">🆔</div><div class="msi-val" style="font-size:10px;word-break:break-all">${d.id}</div><div class="msi-lbl">文件 ID</div></div>`;
-}
-
-function renderCmts(list){
-  const el=document.getElementById('mCmts');
-  if(!list.length){ el.innerHTML='<div class="cmt-empty">暂无留言</div>'; return; }
-  el.innerHTML=list.map(c=>`
-    <div class="cmt">
-      <div class="cmt-head"><span class="cmt-author">${esc(c.author||'Steam用户')}</span><span class="cmt-date">${esc(c.date||'')}</span></div>
-      <div class="cmt-text">${esc(c.text||'')}</div>
-    </div>`).join('');
-}
-
-function closeModal(){
-  document.getElementById('mOv').classList.remove('open');
-  document.body.style.overflow='';
-}
-function mOvClick(e){ if(e.target===document.getElementById('mOv')) closeModal(); }
-
-/* ================================================================
-   DOWNLOAD  – Call local /api/download
-================================================================ */
-function dlWall(fid, title){
-  const btn=document.getElementById(`sub-${fid}`);
-  let packTimer=0;
-  if(btn){
-    btn.classList.add('dling');
-    btn.innerHTML='<i>⏳</i> 正在处理';
-    packTimer=setTimeout(()=>{
-      if(!btn.classList.contains('dling')) return;
-      btn.innerHTML='<i>📦</i> 项目正在打包中';
-      toast('项目正在打包中，请稍候…','info');
-    },1800);
-  }
-  fetch(`/api/download?id=${fid}&title=${encodeURIComponent(title||'')}`)
-    .then(async r=>{
-      if(!r.ok){
-        let msg=`HTTP ${r.status}`;
-        try{
-          const j=await r.json();
-          msg=j.error||msg;
-        }catch{}
-        throw new Error(msg);
-      }
-      const d=r.headers.get('content-disposition')||'';
-      const m=d.match(/filename\*=UTF-8''([^;]+)/i) || d.match(/filename="([^"]+)"/i);
-      const name=decodeURIComponent((m&&m[1])?m[1]:(`${title||('wallpaper-'+fid)}.bin`));
-      return r.blob().then(b=>({b,name}));
-    })
-    .then(({b,name})=>{
-      if(packTimer) clearTimeout(packTimer);
-      const u=URL.createObjectURL(b);
-      const a=document.createElement('a');
-      a.href=u;
-      a.download=name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(()=>URL.revokeObjectURL(u),1500);
-      toast(`已开始下载：${name}`, 'ok');
-      if(btn){
-        btn.classList.remove('dling');
-        btn.classList.add('done');
-        btn.innerHTML='<i>✓</i> 已下载';
-      }
-    })
-    .catch(e=>{
-      if(packTimer) clearTimeout(packTimer);
-      toast('工坊项目下载失败: '+e.message, 'warn');
-      if(btn){ btn.classList.remove('dling'); btn.innerHTML='<i>⚠</i> 失败'; }
-    });
-}
-
-/* ================================================================
-   SERVER STATUS
-================================================================ */
-async function checkServer(){
-  try{
-    const r=await fetch(`/health?_=${Date.now()}`,{cache:'no-store'});
-    if(r.ok){ document.getElementById('dot').className='dot ok'; document.getElementById('srvTxt').textContent='服务在线'; }
-  } catch{
-    document.getElementById('dot').className='dot err';
-    document.getElementById('srvTxt').textContent='连接失败';
-  }
-}
-
-/* ================================================================
-   HELPERS
-================================================================ */
-function getType(item){
-  const ts=(item.tags||[]).map(t=>(t.tag||t).toLowerCase());
-  if(ts.includes('video'))       return 'Video';
-  if(ts.includes('scene'))       return 'Scene';
-  if(ts.includes('application')) return 'App';
-  if(ts.includes('web'))         return 'Web';
-  return 'Scene';
-}
-function fmtN(n){ n=parseInt(n)||0; if(n>=1e6) return (n/1e6).toFixed(1)+'M'; if(n>=1e3) return (n/1e3).toFixed(1)+'K'; return n.toString(); }
-function fmtBytes(b){ b=parseInt(b)||0; if(!b) return '未知'; if(b>=1073741824) return (b/1073741824).toFixed(1)+' GB'; if(b>=1048576) return (b/1048576).toFixed(1)+' MB'; if(b>=1024) return (b/1024).toFixed(1)+' KB'; return b+' B'; }
-function fmtTime(ts){ ts=parseInt(ts); if(!ts) return '未知'; return new Date(ts*1000).toLocaleDateString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit'}); }
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-function toast(msg,type='info'){
-  const wrap=document.getElementById('toasts');
-  const el=document.createElement('div');
-  el.className=`toast ${type}`;
-  el.innerHTML=`<span class="ti">${type==='ok'?'✓':type==='warn'?'⚠':'↗'}</span>${msg}`;
-  wrap.appendChild(el);
-  setTimeout(()=>el.remove(),2700);
-}
-</script>
+<script src="/assets/js/app.js"></script>
 </body>
 </html>

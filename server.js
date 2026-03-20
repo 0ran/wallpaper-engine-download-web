@@ -122,12 +122,49 @@ function readWindowsSystemProxy(protocol) {
     return null;
   }
 }
+
+function readLinuxSystemProxy(protocol) {
+  if (process.platform !== 'linux') return null;
+  try {
+    const isHttps = protocol === 'https:';
+    const proxyEnv = isHttps 
+      ? (process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy)
+      : (process.env.HTTP_PROXY || process.env.http_proxy);
+    
+    console.log('readLinuxSystemProxy', proxyEnv);
+    if (proxyEnv) {
+      return parseProxyUrl(proxyEnv);
+    }
+
+    const gsettings = execFileSync('which', ['gsettings'], { encoding: 'utf8', stdio: 'pipe' }).trim();
+    if (gsettings) {
+      try {
+        const mode = execFileSync('gsettings', ['get', 'org.gnome.system.proxy', 'mode'], { encoding: 'utf8' }).trim();
+        if (mode.includes('manual')) {
+          const httpHost = execFileSync('gsettings', ['get', 'org.gnome.system.proxy.http', 'host'], { encoding: 'utf8' }).trim().replace(/['"]/g, '');
+          const httpPort = parseInt(execFileSync('gsettings', ['get', 'org.gnome.system.proxy.http', 'port'], { encoding: 'utf8' }).trim()) || 8080;
+          
+          if (httpHost && httpPort) {
+            const proxyUrl = `http://${httpHost}:${httpPort}`;
+            return parseProxyUrl(proxyUrl);
+          }
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
 function resolveProxyForProtocol(protocol) {
   const isHttps = protocol === 'https:';
   const envRaw = isHttps
     ? (process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy || process.env.ALL_PROXY || process.env.all_proxy || '')
     : (process.env.HTTP_PROXY || process.env.http_proxy || process.env.ALL_PROXY || process.env.all_proxy || '');
-  return parseProxyUrl(envRaw) || readWindowsSystemProxy(protocol);
+  return parseProxyUrl(envRaw) || readWindowsSystemProxy(protocol) || readLinuxSystemProxy(protocol);
 }
 function proxyAuth(proxy) {
   if (!proxy || !proxy.username) return '';
@@ -192,6 +229,7 @@ function buildUrlFromOpts(opts) {
   const port = opts.port ? `:${opts.port}` : '';
   return `${protocol}//${opts.hostname}${port}${opts.path || '/'}`;
 }
+
 function doRequestByCurl(opts, body, timeout, proxy) {
   return new Promise((resolve, reject) => {
     const url = buildUrlFromOpts(opts);
@@ -215,7 +253,9 @@ function doRequestByCurl(opts, body, timeout, proxy) {
       const payload = Buffer.isBuffer(body) ? body.toString('utf8') : String(body);
       args.push('--data-binary', payload);
     }
-    const cp = spawn('curl.exe', args, { windowsHide: true, env: Object.assign({}, process.env) });
+
+    const curlCommand = process.platform === 'win32' ? 'curl.exe' : 'curl';
+    const cp = spawn(curlCommand, args, { windowsHide: true, env: Object.assign({}, process.env) });
     const chunks = [];
     let err = '';
     cp.stdout.on('data', d => chunks.push(Buffer.from(d)));
@@ -270,7 +310,7 @@ function doRequest(opts, body, redirects, proxyIndex) {
   const proxies = getProxyCandidates(protocol, opts.hostname);
   const proxy = proxies[Math.min(currentProxyIndex, proxies.length - 1)];
   const attemptTimeout = proxy ? Math.min(timeout, 12000) : timeout;
-  if (process.platform === 'win32' && process.env.WALLHUB_DISABLE_CURL_PROXY !== '1') {
+  if (process.env.WALLHUB_DISABLE_CURL_PROXY !== '1') {
     return doRequestByCurlCascade(opts, body, attemptTimeout, proxies, currentProxyIndex);
   }
   return new Promise((resolve, reject) => {
@@ -280,6 +320,7 @@ function doRequest(opts, body, redirects, proxyIndex) {
       }
       reject(err);
     };
+
     const onResponse = (rs) => {
       if (rs.statusCode >= 300 && rs.statusCode < 400 && rs.headers.location) {
         rs.resume();
@@ -313,6 +354,7 @@ function doRequest(opts, body, redirects, proxyIndex) {
       if (body) req.write(body);
       req.end();
     };
+    
     if (!proxy) {
       const mod = protocol === 'http:' ? http : https;
       const req = mod.request({
@@ -343,6 +385,7 @@ function doRequest(opts, body, redirects, proxyIndex) {
       writeEnd(req);
       return;
     }
+    
     const connectHeaders = {};
     if (auth) connectHeaders['Proxy-Authorization'] = auth;
     const connectReq = http.request({
@@ -353,6 +396,7 @@ function doRequest(opts, body, redirects, proxyIndex) {
       headers: connectHeaders,
       timeout: attemptTimeout,
     });
+    
     connectReq.on('connect', (res, socket) => {
       if (res.statusCode !== 200) {
         socket.destroy();
@@ -942,9 +986,13 @@ function mimeFromExt(ext) {
 function ensureDir(p) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
-function runProcess(bin, args, timeoutMs) {
+function runProcess(bin, args, timeoutMs, options = {}) {
   return new Promise((resolve, reject) => {
-    const cp = spawn(bin, args, { windowsHide: true, env: Object.assign({}, process.env) });
+    const spawnOptions = Object.assign({
+      windowsHide: true,
+      env: Object.assign({}, process.env)
+    }, options);
+    const cp = spawn(bin, args, spawnOptions);
     let out = '';
     let err = '';
     const timer = setTimeout(() => {
@@ -972,6 +1020,16 @@ async function resolveSteamCmdPath() {
     'C:\\Program Files (x86)\\SteamCMD\\steamcmd.exe',
     'C:\\Program Files\\SteamCMD\\steamcmd.exe',
   ].filter(Boolean);
+
+  if (process.platform !== 'win32') {
+    candidates.unshift(
+      path.join(__dirname, 'steamcmd', 'steamcmd.sh'),
+      '/usr/bin/steamcmd',
+      '/usr/games/steamcmd',
+      '/usr/local/bin/steamcmd.sh',
+      '/opt/steamcmd/steamcmd.sh'
+    );
+  }
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;
   }
@@ -1063,21 +1121,49 @@ function pickVideoFile(itemDir) {
 async function zipDir(dirPath, zipPath) {
   ensureDir(path.dirname(zipPath));
   if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
-  const cmd = `Compress-Archive -Path '${psQuote(path.join(dirPath, '*'))}' -DestinationPath '${psQuote(zipPath)}' -Force`;
-  await runProcess('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], 180000);
+  
+  if (process.platform === 'win32') {
+    const cmd = `Compress-Archive -Path '${psQuote(path.join(dirPath, '*'))}' -DestinationPath '${psQuote(zipPath)}' -Force`;
+    await runProcess('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], 180000);
+  } else {
+    const zipArgs = ['-r', path.basename(zipPath), '.'];
+    await runProcess('zip', zipArgs, 180000, { cwd: dirPath });
+  }
 }
 async function ensureSteamCmdReady() {
   const found = await resolveSteamCmdPath();
   if (found) return found;
   const base = path.join(__dirname, 'steamcmd');
-  const zipFile = path.join(base, 'steamcmd.zip');
-  const exeFile = path.join(base, 'steamcmd.exe');
   ensureDir(base);
-  const cmd = `$ProgressPreference='SilentlyContinue';Invoke-WebRequest -UseBasicParsing -Uri 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip' -OutFile '${psQuote(zipFile)}';Expand-Archive -Path '${psQuote(zipFile)}' -DestinationPath '${psQuote(base)}' -Force`;
-  await runProcess('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], 240000);
-  if (!fs.existsSync(exeFile)) throw new Error('SteamCMD 自动安装后仍未找到 steamcmd.exe');
-  try { fs.unlinkSync(zipFile); } catch {}
-  return exeFile;
+  
+  if (process.platform === 'win32') {
+    const zipFile = path.join(base, 'steamcmd.zip');
+    const exeFile = path.join(base, 'steamcmd.exe');
+    const cmd = `$ProgressPreference='SilentlyContinue';Invoke-WebRequest -UseBasicParsing -Uri 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip' -OutFile '${psQuote(zipFile)}';Expand-Archive -Path '${psQuote(zipFile)}' -DestinationPath '${psQuote(base)}' -Force`;
+    await runProcess('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], 240000);
+    if (!fs.existsSync(exeFile)) throw new Error('SteamCMD 自动安装后仍未找到 steamcmd.exe');
+    try { fs.unlinkSync(zipFile); } catch {}
+    return exeFile;
+  } else {
+    try {
+      if (process.platform === 'linux') {
+        const steamcmdSh = path.join(base, 'steamcmd.sh');
+        if (!fs.existsSync(steamcmdSh)) {
+          const downloadCmd = `curl -sSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | tar -xz -C '${psQuote(base)}'`;
+          await runProcess('sh', ['-c', downloadCmd], 240000);
+        }
+        
+        if (fs.existsSync(steamcmdSh)) {
+          await runProcess('chmod', ['+x', steamcmdSh], 5000);
+          return steamcmdSh;
+        }
+      }
+    } catch (e) {
+      console.warn('Linux SteamCMD 自动安装失败:', e.message);
+    }
+
+    throw new Error('未找到 SteamCMD。请在 Linux 上手动安装 SteamCMD:\n1. sudo apt install steamcmd (Ubuntu/Debian)\n2. 或从 https://developer.valvesoftware.com/wiki/SteamCMD#Linux 下载并解压到 steamcmd/ 目录');
+  }
 }
 function resolveLocalAccount(appId) {
   const candidates = [
@@ -1119,10 +1205,21 @@ async function downloadViaSteamCmd(publishedFileId, appId, title, options) {
     { name: 'normal', itemArgs: ['+workshop_download_item', String(appId), String(publishedFileId)] },
     { name: 'validate', itemArgs: ['+workshop_download_item', String(appId), String(publishedFileId), 'validate'] },
   ];
+
+  let steamcmdCommand, steamcmdArgsPrefix;
+  if (process.platform === 'win32') {
+    steamcmdCommand = steamcmd;
+    steamcmdArgsPrefix = [];
+  } else {
+    steamcmdCommand = '/bin/bash';
+    steamcmdArgsPrefix = [steamcmd];
+  }
+  
   for (const at of attempts) {
     for (const variant of variants) {
       try {
         const args = [
+          ...steamcmdArgsPrefix,
           '+@ShutdownOnFailedCommand', '1',
           '+@NoPromptForPassword', '1',
           '+force_install_dir', tempRoot,
@@ -1130,7 +1227,7 @@ async function downloadViaSteamCmd(publishedFileId, appId, title, options) {
           ...variant.itemArgs,
           '+quit',
         ];
-        await runProcess(steamcmd, args, 300000);
+        await runProcess(steamcmdCommand, args, 300000);
         const discovered = findWorkshopItemDir(tempRoot, appId, publishedFileId);
         if (discovered && fs.existsSync(discovered)) {
           const files = fs.readdirSync(discovered);

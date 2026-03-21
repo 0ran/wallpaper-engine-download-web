@@ -1,5 +1,22 @@
 /dumps/
 /downloads/
+/tmp/
+/temp/
+/logs/
+/*.log
+/*.tmp
+/*.temp
+/node_modules/
+/coverage/
+/dist/
+/build/
+/.cache/
+/.idea/
+/.vscode/
+/.DS_Store
+/Thumbs.db
+/.env
+/.env.*
 /steamcmd/logs/
 /steamcmd/appcache/
 /steamcmd/config/
@@ -13,3 +30,4 @@
 /steamcmd/.crash
 /steamcmd/*.old
 /steamcmd/*.zip
+/steamcmd/

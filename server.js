@@ -942,6 +942,22 @@ function mimeFromExt(ext) {
 function ensureDir(p) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
+function removeDirSafe(p) {
+  if (!p) return;
+  try {
+    fs.rmSync(p, { recursive: true, force: true });
+  } catch {}
+}
+function registerResponseCleanup(res, fn) {
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    try { fn(); } catch {}
+  };
+  res.once('finish', run);
+  res.once('close', run);
+}
 function runProcess(bin, args, timeoutMs) {
   return new Promise((resolve, reject) => {
     const cp = spawn(bin, args, { windowsHide: true, env: Object.assign({}, process.env) });
@@ -1110,64 +1126,69 @@ async function downloadViaSteamCmd(publishedFileId, appId, title, options) {
   const user = envUser || (localAcc && localAcc.user) || '';
   const pass = envPass || (localAcc && localAcc.pass) || '';
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wallhub-steamcmd-'));
-  let itemDir = path.join(tempRoot, 'steamapps', 'workshop', 'content', String(appId), String(publishedFileId));
-  const attempts = [];
-  if (user && pass) attempts.push({ name: 'account', loginArgs: ['+login', user, pass] });
-  attempts.push({ name: 'anonymous', loginArgs: ['+login', 'anonymous'] });
-  let lastErr = '';
-  const variants = [
-    { name: 'normal', itemArgs: ['+workshop_download_item', String(appId), String(publishedFileId)] },
-    { name: 'validate', itemArgs: ['+workshop_download_item', String(appId), String(publishedFileId), 'validate'] },
-  ];
-  for (const at of attempts) {
-    for (const variant of variants) {
-      try {
-        const args = [
-          '+@ShutdownOnFailedCommand', '1',
-          '+@NoPromptForPassword', '1',
-          '+force_install_dir', tempRoot,
-          ...at.loginArgs,
-          ...variant.itemArgs,
-          '+quit',
-        ];
-        await runProcess(steamcmd, args, 300000);
-        const discovered = findWorkshopItemDir(tempRoot, appId, publishedFileId);
-        if (discovered && fs.existsSync(discovered)) {
-          const files = fs.readdirSync(discovered);
-          if (files.length) {
-            itemDir = discovered;
-            break;
+  try {
+    let itemDir = path.join(tempRoot, 'steamapps', 'workshop', 'content', String(appId), String(publishedFileId));
+    const attempts = [];
+    if (user && pass) attempts.push({ name: 'account', loginArgs: ['+login', user, pass] });
+    attempts.push({ name: 'anonymous', loginArgs: ['+login', 'anonymous'] });
+    let lastErr = '';
+    const variants = [
+      { name: 'normal', itemArgs: ['+workshop_download_item', String(appId), String(publishedFileId)] },
+      { name: 'validate', itemArgs: ['+workshop_download_item', String(appId), String(publishedFileId), 'validate'] },
+    ];
+    for (const at of attempts) {
+      for (const variant of variants) {
+        try {
+          const args = [
+            '+@ShutdownOnFailedCommand', '1',
+            '+@NoPromptForPassword', '1',
+            '+force_install_dir', tempRoot,
+            ...at.loginArgs,
+            ...variant.itemArgs,
+            '+quit',
+          ];
+          await runProcess(steamcmd, args, 300000);
+          const discovered = findWorkshopItemDir(tempRoot, appId, publishedFileId);
+          if (discovered && fs.existsSync(discovered)) {
+            const files = fs.readdirSync(discovered);
+            if (files.length) {
+              itemDir = discovered;
+              break;
+            }
           }
+          const reason = extractSteamCmdFailure(steamcmd, appId, publishedFileId);
+          lastErr = `${at.name}/${variant.name} 未产出文件${reason ? `（${reason}）` : ''}`;
+        } catch (e) {
+          const reason = extractSteamCmdFailure(steamcmd, appId, publishedFileId);
+          lastErr = `${at.name}/${variant.name} 失败: ${e.message}${reason ? `（${reason}）` : ''}`;
         }
-        const reason = extractSteamCmdFailure(steamcmd, appId, publishedFileId);
-        lastErr = `${at.name}/${variant.name} 未产出文件${reason ? `（${reason}）` : ''}`;
-      } catch (e) {
-        const reason = extractSteamCmdFailure(steamcmd, appId, publishedFileId);
-        lastErr = `${at.name}/${variant.name} 失败: ${e.message}${reason ? `（${reason}）` : ''}`;
+        if (fs.existsSync(itemDir) && fs.readdirSync(itemDir).length) break;
       }
       if (fs.existsSync(itemDir) && fs.readdirSync(itemDir).length) break;
     }
-    if (fs.existsSync(itemDir) && fs.readdirSync(itemDir).length) break;
-  }
-  if (!fs.existsSync(itemDir)) throw new Error(lastErr || 'SteamCMD 执行完成但未产出工坊文件目录');
-  if (!fs.readdirSync(itemDir).length) {
-    throw new Error(user && pass
-      ? `SteamCMD 未下载到文件（${lastErr}）`
-      : `匿名下载失败（${lastErr}），请设置 STEAM_USERNAME/STEAM_PASSWORD 继续`);
-  }
-  const wantVideoOnly = !!(options && options.videoOnly);
-  if (wantVideoOnly) {
-    const videoPath = pickVideoFile(itemDir);
-    if (videoPath) {
-      const videoExt = extFromPath(videoPath, '.mp4');
-      const videoName = `${safeName(title || `Wallpaper ${publishedFileId}`)}-${publishedFileId}${videoExt}`;
-      return { kind: 'file', filePath: videoPath, fileName: videoName };
+    if (!fs.existsSync(itemDir)) throw new Error(lastErr || 'SteamCMD 执行完成但未产出工坊文件目录');
+    if (!fs.readdirSync(itemDir).length) {
+      throw new Error(user && pass
+        ? `SteamCMD 未下载到文件（${lastErr}）`
+        : `匿名下载失败（${lastErr}），请设置 STEAM_USERNAME/STEAM_PASSWORD 继续`);
     }
+    const wantVideoOnly = !!(options && options.videoOnly);
+    if (wantVideoOnly) {
+      const videoPath = pickVideoFile(itemDir);
+      if (videoPath) {
+        const videoExt = extFromPath(videoPath, '.mp4');
+        const videoName = `${safeName(title || `Wallpaper ${publishedFileId}`)}-${publishedFileId}${videoExt}`;
+        return { kind: 'file', filePath: videoPath, fileName: videoName, cleanupDir: tempRoot };
+      }
+    }
+    const zipName = `${safeName(title || `Wallpaper ${publishedFileId}`)}-${publishedFileId}.zip`;
+    const zipPath = path.join(tempRoot, zipName);
+    await zipDir(itemDir, zipPath);
+    return { kind: 'zip', zipPath, zipName, cleanupDir: tempRoot };
+  } catch (e) {
+    removeDirSafe(tempRoot);
+    throw e;
   }
-  const zipName = `${safeName(title || `Wallpaper ${publishedFileId}`)}-${publishedFileId}.zip`;
-  const zipPath = path.join(DOWNLOAD_DIR, zipName);
-  await zipDir(itemDir, zipPath);
-  return { kind: 'zip', zipPath, zipName };
 }
 async function handleDownload(res, id, title) {
   const wantId = parseInt(id);
@@ -1186,6 +1207,10 @@ async function handleDownload(res, id, title) {
   if (!sourceUrl) {
     try {
       const downloaded = await downloadViaSteamCmd(wantId, appId, title || d.title, { videoOnly: isVideo });
+      registerResponseCleanup(res, () => {
+        removeDirSafe(downloaded.cleanupDir);
+        removeDirSafe(DOWNLOAD_DIR);
+      });
       if (downloaded.kind === 'file') {
         const st = fs.statSync(downloaded.filePath);
         const ext = extFromPath(downloaded.filePath, '.mp4');

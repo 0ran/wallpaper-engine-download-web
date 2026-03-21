@@ -21,7 +21,6 @@ const { URL } = require('url');
 const PORT   = process.env.PORT ? parseInt(process.env.PORT) : 3090;
 const PUBLIC = path.join(__dirname, 'public');
 
-const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
 const PERSONA_CACHE = new Map();
 const STEAM_PREF_COOKIE = [
   'birthtime=946684801',
@@ -942,6 +941,12 @@ function mimeFromExt(ext) {
 function ensureDir(p) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
+function removePathSafe(target) {
+  if (!target) return;
+  try {
+    fs.rmSync(target, { recursive: true, force: true });
+  } catch {}
+}
 function runProcess(bin, args, timeoutMs) {
   return new Promise((resolve, reject) => {
     const cp = spawn(bin, args, { windowsHide: true, env: Object.assign({}, process.env) });
@@ -1030,18 +1035,38 @@ function extractSteamCmdFailure(steamcmdPath, appId, publishedFileId) {
     if (line.includes(`Download item ${item} requested by app`)) { from = i; break; }
   }
   if (from < 0) return '';
-  const window = rows.slice(from, Math.min(rows.length, from + 40));
+  const window = rows.slice(from, Math.min(rows.length, from + 120));
+  let lastRelated = '';
   for (const line of window) {
-    if (!line.includes(`[AppID ${app}]`)) continue;
-    if (line.includes('result : No Connection') || line.includes('Failed downloading') || line.includes('No connection')) {
+    const related = line.includes(`[AppID ${app}]`) || line.includes(`item ${item}`) || line.includes(`item ${item}.`);
+    if (!related) continue;
+    lastRelated = String(line || '').trim();
+    const low = lastRelated.toLowerCase();
+    if (low.includes('result : no connection') || low.includes('failed downloading') || low.includes('no connection') || low.includes('connection was reset') || low.includes('connection reset by peer')) {
       return 'SteamCDN 网络连接失败（No Connection）';
     }
-    if (line.includes('result : Access Denied')) {
+    if (low.includes('result : access denied') || low.includes('access denied')) {
       return 'Steam 返回 Access Denied（权限不足或需要登录账号）';
     }
-    if (line.includes('result : Timeout')) {
+    if (low.includes('result : timeout') || low.includes('timed out')) {
       return 'Steam 下载超时（Timeout）';
     }
+    if (low.includes('failed to initialize depot') || low.includes('failed to init depot') || low.includes('depot') && low.includes('manifest')) {
+      return 'Steam Depot 初始化失败（多为代理链路不稳定或节点不支持）';
+    }
+    if (low.includes('login failure') || low.includes('invalid password') || low.includes('two-factor') || low.includes('steam guard')) {
+      return 'Steam 登录失败（账号凭据或 Steam Guard 校验问题）';
+    }
+    if (low.includes('rate limit') || low.includes('too many') && low.includes('login')) {
+      return 'Steam 登录请求触发频率限制（Rate Limit）';
+    }
+    if (low.includes('requires ownership') || low.includes('not subscribed') || low.includes('insufficient privilege')) {
+      return '该工坊项目受权限限制，匿名账号无法下载';
+    }
+  }
+  if (lastRelated) {
+    const brief = lastRelated.replace(/\s+/g, ' ').slice(0, 160);
+    return `SteamCMD 日志提示: ${brief}`;
   }
   return '';
 }
@@ -1161,13 +1186,23 @@ async function downloadViaSteamCmd(publishedFileId, appId, title, options) {
     if (videoPath) {
       const videoExt = extFromPath(videoPath, '.mp4');
       const videoName = `${safeName(title || `Wallpaper ${publishedFileId}`)}-${publishedFileId}${videoExt}`;
-      return { kind: 'file', filePath: videoPath, fileName: videoName };
+      return {
+        kind: 'file',
+        filePath: videoPath,
+        fileName: videoName,
+        cleanup: () => removePathSafe(tempRoot),
+      };
     }
   }
   const zipName = `${safeName(title || `Wallpaper ${publishedFileId}`)}-${publishedFileId}.zip`;
-  const zipPath = path.join(DOWNLOAD_DIR, zipName);
+  const zipPath = path.join(tempRoot, zipName);
   await zipDir(itemDir, zipPath);
-  return { kind: 'zip', zipPath, zipName };
+  return {
+    kind: 'zip',
+    zipPath,
+    zipName,
+    cleanup: () => removePathSafe(tempRoot),
+  };
 }
 async function handleDownload(res, id, title) {
   const wantId = parseInt(id);
@@ -1186,6 +1221,12 @@ async function handleDownload(res, id, title) {
   if (!sourceUrl) {
     try {
       const downloaded = await downloadViaSteamCmd(wantId, appId, title || d.title, { videoOnly: isVideo });
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        try { downloaded.cleanup && downloaded.cleanup(); } catch {}
+      };
       if (downloaded.kind === 'file') {
         const st = fs.statSync(downloaded.filePath);
         const ext = extFromPath(downloaded.filePath, '.mp4');
@@ -1195,7 +1236,11 @@ async function handleDownload(res, id, title) {
           'Content-Disposition': `attachment; filename="${encodeURIComponent(downloaded.fileName)}"; filename*=UTF-8''${encodeURIComponent(downloaded.fileName)}`,
           'Cache-Control': 'no-store',
         });
-        fs.createReadStream(downloaded.filePath).pipe(res);
+        const rs = fs.createReadStream(downloaded.filePath);
+        rs.on('error', () => cleanup());
+        res.on('close', cleanup);
+        res.on('finish', cleanup);
+        rs.pipe(res);
       } else {
         const st = fs.statSync(downloaded.zipPath);
         res.writeHead(200, {
@@ -1204,7 +1249,11 @@ async function handleDownload(res, id, title) {
           'Content-Disposition': `attachment; filename="${encodeURIComponent(downloaded.zipName)}"; filename*=UTF-8''${encodeURIComponent(downloaded.zipName)}`,
           'Cache-Control': 'no-store',
         });
-        fs.createReadStream(downloaded.zipPath).pipe(res);
+        const rs = fs.createReadStream(downloaded.zipPath);
+        rs.on('error', () => cleanup());
+        res.on('close', cleanup);
+        res.on('finish', cleanup);
+        rs.pipe(res);
       }
       return;
     } catch (e) {

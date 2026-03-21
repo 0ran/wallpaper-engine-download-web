@@ -1003,6 +1003,7 @@ body.theme-light .theme-icon.moon {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 .proxy-btn {
   background: var(--accent);
@@ -1014,11 +1015,6 @@ body.theme-light .theme-icon.moon {
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
-}
-.proxy-btn.alt {
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  color: var(--text2);
 }
 
 .wgrid {
@@ -1227,9 +1223,19 @@ body.theme-light .theme-icon.moon {
   height: 34px;
   padding: 0 12px;
 }
+.card.lv .sub-btn.progressing {
+  height: 34px;
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 12px;
+}
 
 .sub-btn {
   flex: 1;
+  --dl-progress: 0%;
+  height: 34px;
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   border: none;
   border-radius: 7px;
@@ -1237,7 +1243,7 @@ body.theme-light .theme-icon.moon {
   font-size: 13px;
   font-family: "Noto Sans SC", sans-serif;
   font-weight: 500;
-  padding: 8px 10px;
+  padding: 0 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1245,6 +1251,37 @@ body.theme-light .theme-icon.moon {
   gap: 5px;
   transition: all var(--tr);
   white-space: nowrap;
+}
+.sub-btn::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--dl-progress);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
+  pointer-events: none;
+  transition: width 0.35s ease;
+}
+.sub-btn.progressing {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+}
+.sub-main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+}
+.sub-main-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sub-btn:hover {
   box-shadow: 0 4px 15px rgba(79, 156, 249, 0.4);
@@ -1262,6 +1299,9 @@ body.theme-light .theme-icon.moon {
   border: 1px solid var(--success);
   color: var(--success);
   pointer-events: none;
+}
+.sub-btn.done::before {
+  background: linear-gradient(90deg, rgba(61, 220, 132, 0.3), rgba(61, 220, 132, 0.12));
 }
 
 .pagination {

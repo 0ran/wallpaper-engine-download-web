@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WE · Steam 壁纸工坊</title>
+<link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">Wallpaper Engine <span>Hub</span></div>
+  <div class="search-wrap">
+    <input class="search-input" type="text" id="searchInput" placeholder="搜索壁纸名称..." autocomplete="off">
+    <button class="search-btn" id="searchBtn" title="搜索" aria-label="搜索">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    </button>
+  </div>
+  <div class="header-actions">
+    <div class="actions-main">
+      <div class="lang-switch" role="group" aria-label="Language switch">
+        <button class="lang-btn active" id="langBtn" type="button" title="切换语言" aria-label="切换语言">中</button>
+      </div>
+      <button class="head-theme-btn" id="themeBtn" title="切换主题" aria-label="切换主题">
+        <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.8"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+        <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.8A8.8 8.8 0 1 1 9.2 4a7.3 7.3 0 0 0 10.8 10.8Z"/><path d="M16.8 3.8v2.2M15.7 4.9H18"/></svg>
+      </button>
+      <button class="head-help-btn" id="usageBtn" title="说明" aria-label="说明">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v15H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M4 6.5V21"/><path d="M8 8h8"/><path d="M8 12h8"/></svg>
+      </button>
+    </div>
+    <span class="actions-divider" aria-hidden="true"></span>
+    <div class="actions-social">
+      <a class="head-icon-btn" href="https://github.com/0ran/wallpaper-engine-download-web" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A12 12 0 0 0 8.2 23.9c.6.1.8-.2.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.6-1.3-1.3-1.7-1.3-1.7-1.1-.8.1-.8.1-.8 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.4-1.3-5.4-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.4 5.9.4.3.8 1 .8 2.1v3.1c0 .4.2.7.8.6A12 12 0 0 0 12 .5Z"/></svg>
+      </a>
+      <a class="head-icon-btn" href="https://space.bilibili.com/111174060" target="_blank" rel="noopener noreferrer" title="哔哩哔哩" aria-label="哔哩哔哩主页">
+        <svg width="18" height="18" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true"><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <div class="fg" id="sortGrp">
+    <span class="fl">排序依据</span>
+    <select class="sel" id="sortSel">
+      <option value="trend">最热门</option>
+      <option value="mostrecent">最新</option>
+      <option value="lastupdated">最后更新</option>
+      <option value="totaluniquesubscribers">最多订阅</option>
+    </select>
+  </div>
+  <!-- 时间：仅最热门时显示 -->
+  <div class="fg" id="daysGrp">
+    <span class="fl">时间排序</span>
+    <select class="sel" id="daysSel">
+      <option value="1">今天</option>
+      <option value="7" selected>一周</option>
+      <option value="30">一个月</option>
+      <option value="90">三个月</option>
+      <option value="180">半年</option>
+      <option value="365">一年</option>
+      <option value="0">有史以来</option>
+    </select>
+  </div>
+  <div class="fdiv"></div>
+  <div class="fg" id="typeGrp">
+    <span class="fl">类型选择</span>
+    <select class="sel" id="typeSel">
+      <option value="">全部</option>
+      <option value="Scene">场景</option>
+      <option value="Video" selected>视频</option>
+      <option value="Web">网站</option>
+      <option value="Application">应用</option>
+    </select>
+  </div>
+  <div class="fg" id="ratingGrp">
+    <span class="fl">年龄评级</span>
+    <select class="sel" id="ratingSel">
+      <option value="">全部</option>
+      <option value="Everyone">大众级</option>
+      <option value="Questionable">家长指导级</option>
+      <option value="Mature">限制成人级</option>
+    </select>
+  </div>
+  <button class="filter-btn" id="filterBtn" onclick="openSB()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+    筛选 <span class="badge" id="fbadge">0</span>
+  </button>
+</div>
+
+<!-- Sidebar -->
+<div class="sb-ov" id="sbOv" onclick="closeSB()"></div>
+<aside class="sidebar" id="sb">
+  <div class="sb-head">
+    <div class="sb-title">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      Genre 类型筛选
+    </div>
+    <button class="xbtn" onclick="closeSB()">×</button>
+  </div>
+  <div class="sb-body">
+    <div class="sb-sec">
+      <div class="genre-grid" id="genreGrid"></div>
+    </div>
+  </div>
+  <div class="sb-foot">
+    <button class="btn-s" id="genreToggleBtn" onclick="toggleGenresAll()">清除</button>
+    <button class="btn-p" onclick="applyFilters()">应用筛选</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="sec-head">
+    <div class="sec-info">
+      <span class="sec-title">Steam 创意工坊壁纸</span>
+      <span class="res-count" id="resCnt">加载中...</span>
+    </div>
+    <div class="view-tog">
+      <button class="vbtn active" id="vgrid" onclick="setView('grid')" title="网格">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
+      <button class="vbtn" id="vlist" onclick="setView('list')" title="列表">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <div id="wcon"></div>
+  <div id="pgn" class="pagination"></div>
+</main>
+
+<!-- Modal -->
+<div class="modal-ov" id="mOv" onclick="mOvClick(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="mTitle"></div>
+        <div class="modal-sub" id="mSub"></div>
+      </div>
+      <button class="xbtn" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <img class="modal-img" id="mImg" src="" alt="">
+      <div class="mstats" id="mStats"></div>
+      <div class="modal-desc" id="mDesc"></div>
+      <div class="modal-tags" id="mTags"></div>
+      <div class="cmt-sec">
+        <div class="cmt-title">💬 用户留言</div>
+        <div class="cmt-list" id="mCmts">
+          <div class="cmt-spin"><div class="spinner-sm"></div>加载留言中...</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="modal-sub-btn" id="mSubBtn">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        订阅 / 下载壁纸
+      </button>
+      <a class="steam-link" id="mSteam" href="#" target="_blank">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Steam页面
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<div class="usage-ov" id="usageOv" onclick="usageOvClick(event)">
+  <div class="usage-card">
+    <div class="usage-head">
+      <div class="usage-title">使用说明</div>
+      <button class="usage-close" onclick="closeUsage()">×</button>
+    </div>
+    <div class="usage-body">
+      <div class="usage-topic">
+        <div class="usage-topic-text">此项目不需要登陆Steam账号，即可下载 wallpaper engine 所有壁纸项目。</div>
+      </div>
+      <div class="usage-item limit"><b>访问限制：</b><br>使用本工具需开启网络代理，否则无法访问 Steam 创意工坊资源。</div>
+      <div class="usage-item pack"><b>下载与打包规则：</b><br>场景类 / 页面类 / 程序类壁纸：下载后自动打包为 .zip 压缩文件，需解压后访问；<br>视频类壁纸：仅下载原始视频文件，无压缩打包流程，下载后可直接播放。</div>
+      <div class="usage-item dev"><b>开发说明：</b><br>本项目全程依托人工智能辅助完成构建，发布者未审阅、未编写任何一行代码内容，若与其他项目存在代码雷同，均属巧合。</div>
+      <div class="usage-note">本工具并非用于规避 Wallpaper Engine 正版购买权益，严格遵循非商用、个人自用的使用场景。</div>
+    </div>
+  </div>
+</div>
+
+<footer class="site-disclaimer" hidden>
+  <div class="disclaimer-inner" id="siteDisclaimerText">免责声明：本项目在人工智能辅助下完成开发与整理，发布者未逐行人工审阅或手写核心代码；若与其他项目存在相似实现，可能属于技术方案趋同。项目仅供学习交流，请勿用于商业用途或侵权场景。</div>
+</footer>
+
+<script src="/assets/js/app.js"></script>
+</body>
+</html>

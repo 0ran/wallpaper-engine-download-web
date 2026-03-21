@@ -1,0 +1,12 @@
+{
+  "name": "wallpaper-engine-download-web",
+  "version": "2.0.1",
+  "private": true,
+  "description": "Steam 创意工坊壁纸浏览器 — 无需登录账号 — 仅需 Node.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
